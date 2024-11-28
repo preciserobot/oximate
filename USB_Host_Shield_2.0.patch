@@ -1,0 +1,76 @@
+diff --color -ruN USB_Host_Shield_2.0/UsbCore.h USB_Host_Shield_2.0_patched/UsbCore.h
+--- libraries/USB_Host_Shield_2.0/UsbCore.h
++++ libraries/USB_Host_Shield_2.0/UsbCore.h
+@@ -51,7 +51,7 @@
+ #elif defined(ARDUINO_XIAO_ESP32S3)
+ typedef MAX3421e<P44, P4> MAX3421E; // ESP32 XIAO boards
+ #elif defined(ESP32)
+-typedef MAX3421e<P5, P17> MAX3421E; // ESP32 boards
++typedef MAX3421e<P19, P35> MAX3421E; // ESP32 boards
+ #elif defined(ARDUINO_Seeed_XIAO_nRF52840_Sense)
+ typedef MAX3421e<P7, P5> MAX3421E; // Seeed_XIAO_nRF52840_Sense
+ #elif defined(MIGHTYCORE)
+diff --color -ruN USB_Host_Shield_2.0/avrpins.h USB_Host_Shield_2.0_patched/avrpins.h
+--- libraries/USB_Host_Shield_2.0/avrpins.h
++++ libraries/USB_Host_Shield_2.0/avrpins.h
+@@ -1934,11 +1934,11 @@
+ MAKE_PIN(P3, 3); // RX0
+ MAKE_PIN(P21, 21); // SDA
+ MAKE_PIN(P22, 22); // SCL
+-MAKE_PIN(P19, 19); // MISO
++MAKE_PIN(P38, 38); // MISO
+ MAKE_PIN(P23, 23); // MOSI
+ MAKE_PIN(P18, 18); // SCK
+-MAKE_PIN(P5, 5); // SS
+-MAKE_PIN(P17, 17); // INT
++MAKE_PIN(P19, 19); // SS
++MAKE_PIN(P35, 35); // INT
+
+ #endif
+
+diff --color -ruN USB_Host_Shield_2.0/usbhost.h USB_Host_Shield_2.0_patched/usbhost.h
+--- libraries/USB_Host_Shield_2.0/usbhost.h
++++ libraries/USB_Host_Shield_2.0/usbhost.h
+@@ -121,7 +121,7 @@
+ #elif defined(ARDUINO_XIAO_ESP32S3)
+ typedef SPi< P7, P9, P8, P44 > spi;
+ #elif defined(ESP32)
+-typedef SPi< P18, P23, P19, P5 > spi;
++typedef SPi< P18, P23, P38, P19 > spi;
+ #elif defined(ARDUINO_NRF52840_FEATHER) || defined(ARDUINO_NRF52840_FEATHER_SENSE)
+ typedef SPi< P26, P25, P24, P5 > spi;
+ #elif defined(ARDUINO_Seeed_XIAO_nRF52840_Sense)
+diff --color -ruN USB_Host_Shield_2.0/library.json USB_Host_Shield_2.0_patched/library.json
+--- libraries/USB_Host_Shield_2.0/library.json
++++ libraries/USB_Host_Shield_2.0/library.json
+@@ -21,14 +21,18 @@
+     {
+       "name": "Andrew Kroll",
+       "email": "xxxajk@gmail.com"
++    },
++    {
++      "name": "preciserobot",
++      "email": "dbrawand@gmail.com"
+     }
+   ],
+   "repository":
+   {
+     "type": "git",
+-    "url": "https://github.com/felis/USB_Host_Shield_2.0.git"
++    "url": "https://github.com/preciserobot/oximate.git"
+   },
+-  "version": "1.7.0",
++  "version": "1.7.0-core2patch",
+   "license": "GPL-2.0",
+   "examples":
+   [
+diff --color -ruN USB_Host_Shield_2.0/library.properties USB_Host_Shield_2.0_patched/library.properties
+--- libraries/USB_Host_Shield_2.0/library.properties
++++ libraries/USB_Host_Shield_2.0/library.properties
+@@ -1,5 +1,5 @@
+ name=USB Host Shield Library 2.0
+-version=1.7.0
++version=1.7.0-core2patch
+ author=Oleg Mazurov <mazurov@gmail.com>, Kristian Sloth Lauszus <lauszus@gmail.com>, Andrew Kroll <xxxajk@gmail.com>, Alexei Glushchenko <alex-gl@mail.ru>
+ maintainer=Kristian Sloth Lauszus <lauszus@gmail.com>
+ sentence=Revision 2.0 of MAX3421E-based USB Host Shield Library.

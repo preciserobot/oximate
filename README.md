@@ -7,7 +7,7 @@ Oxi One Remote for Dirtywave M8
 1. Show MIDI Messages on diplay (does it already)
 2. Act as a USB MIDI host and send to attached midi port.
 3. Remote control the Oxi One? Does it override Oxi behaviour?
-3. Build Abletopn Push 2 Interface
+3. Build Ableton Push 2 Interface
 
 ## What is currently does
 
@@ -17,36 +17,46 @@ Makes the Core2 remote control the Oxi One sequencer to make it usable as a cont
 2. Update Display
 3. Filter any messages from Oxi user inputs and route to specific MIDI commands.
 
-## M5Stack Core + USB host module
+## Hardware
 
-The M5Stack USB module provides the USB host interface for the printer. The USB
-module is based on the MAX3421E USB chip which is supported by the USB Host
-Shield 2.0 library.
+* M5Stack core2 (ESP32, battery, display, etc.)
+* M5Stack USB host module v1.2 (MAX3421E)
+* M5Stack GO Bottom2 (optional)
+* USB MIDI keyboard or other USB-MIDI compliant device.
 
-### Hardware
-
-* M5Stack core (ESP32, battery, display, etc.) https://m5stack.com/collections/m5-core/products/grey-development-core
-* M5Stack USB host module (MAX3421E) https://m5stack.com/collections/m5-module/products/usb-module
-* USB MIDI keyboard
-* USB cable
-
-### Libraries
+## Libraries
 
 * USB Host Shield 2.0 https://github.com/felis/USB_Host_Shield_2.0
-* Highly recommended: PR #473
-* Highly recommended if using USB hubs: PR #414
+* M5-SAM2695 https://github.com/m5stack/M5-SAM2695
+* M5Unified
+* M5GFX
 
-## Arduino upload failure
+## Setup
 
-I found installing a 1 uF capacitor between GND and RST helps a lot. See
-the link for more discussion.
+> The Core2 uses different GPIO mappings for the SPI interface.
 
-http://community.m5stack.com/topic/55/simple-fix-when-upload-fails
+### USB Host Shield 2.0-core2patch
+One must use the patched version of the `USB Host Shield 2.0` library
+with the correct pin mappings (1.7.0-core2patch).
 
-## Battery Power On Failure
+The pathched library is included in the `libraries` folder.
 
-When running on battery, the M5Stack does not turn on when the USB host module
-is installed. The M5Stack works fine running on battery but once it is turned
-off, it can only be turned on by plugging in power via the USB jack.
 
-The M5Stack power on works correctly when the USB host module is removed.
+### M5Stack USB Module v1.2
+
+Set the DIP switches to accroding to the mapping below.
+
+SPI  | GPIO | Comment
+-----|------|--------
+MOSI | 23   |
+MISO | 38   |
+SCK  | 18   |
+SS   | 19   | Set this on the USB board.
+INT  | 35   | Set this on the USB board.
+
+> Do not use 33 for `SS`, its used by the I2C bus that binds IMU and Microphone.
+
+### Compile and install
+
+The `Makefile` has target to compile and send to the Core2.
+
