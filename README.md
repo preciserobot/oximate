@@ -19,9 +19,25 @@ synth.
 | # | Stage | Status |
 |---|-------|--------|
 | 1 | **MIDI monitor + merge**: show all incoming MIDI and merge USB and DIN inputs to DIN OUT | done, untested on hardware |
-| 2 | **Router**: set up routing, channel filters and remapping, and the SAM2695 voice on the device | planned |
+| 2 | **Router + LEDs**: set up routing, channel filters and remapping on the device, save the settings, and show input activity on the LED bar | in progress |
 | 3 | **Oxi One remote**: put the Oxi One in remote mode and use it as a control surface for the M8 | planned |
 | 4 | **Push 2 host**: use an Ableton Push 2 as a control surface and step sequencer, like the Oxi One | planned |
+| 5 | **Pocket drum machine**: a 16-step touch grid plays the SAM2695 drum kit, with the playhead on the LED bar | idea |
+| 6 | **Monitor preview synth**: hear any incoming channel on the SAM2695, with the instrument chosen on screen (includes setting the SAM2695 voice, moved here from stage 2) | idea |
+| 7 | **Ear trainer / chord explorer**: play intervals and chords on the SAM2695 and answer on the touch screen | idea |
+| 8 | **Clock master**: tap tempo, swing, start/stop and clock dividers, with the LED bar pulsing on the beat | idea |
+| 9 | **Clock analyser**: measure the jitter and drift of incoming MIDI clock | idea |
+| 10 | **Haptic metronome**: the vibration motor pulses on the beat | idea |
+| 11 | **MIDI effects**: arpeggiator, chords, scale quantiser, transpose, velocity curves, CC scaling | idea |
+| 12 | **Generative sequencers**: Euclidean rhythms, and a looping random sequence that slowly mutates | idea |
+| 13 | **MIDI recorder / looper**: record the merged stream to SD card as `.mid` files and play it back | idea |
+| 14 | **SysEx librarian**: send `.syx` files from SD card and capture SysEx dumps | idea |
+| 15 | **Setlist / scene recall**: send program changes and CC snapshots to several devices with one touch | idea |
+| 16 | **Panic & diagnostics**: All Notes Off, a stuck-note detector, per-channel activity on the LEDs | idea |
+| 17 | **BLE MIDI bridge**: wireless MIDI to and from an iPad or Mac | idea |
+| 18 | **Network MIDI**: RTP-MIDI / AppleMIDI over Wi-Fi | idea |
+| 19 | **More controls**: add M5 Grove units (8-Encoder, Dual Button, Angle) as physical knobs and buttons | idea |
+| 20 | **DFAM MIDI-to-CV**: play the Moog DFAM's 8 steps from MIDI notes and drive its CV inputs from CCs (needs a small CV board) | idea |
 
 Stage 2 was originally "send USB MIDI to the attached MIDI port". Stage 1
 already does that, so stage 2 is now about making the routing configurable.
@@ -74,6 +90,62 @@ The Core2's USB-C port is a USB-serial bridge (CH9102), not a USB MIDI
 device. It can't appear as a MIDI port on a computer. All USB MIDI goes through
 the USB Host Module.
 
+## Architecture
+
+These rules apply to every stage.
+
+* **Pages and modes.** The UI is a set of pages, such as Monitor, Router and,
+  later, Drum machine and Push 2. MIDI merging and routing keep running in the
+  background whichever page is shown. Later stages add pages, and a mode menu
+  once there are more than a few.
+* **Buttons.**
+  * **Tap the header bar** (top of the screen) to switch to the next page.
+  * **Touch buttons A/B/C always belong to the current page.** Each page shows
+    their labels in the footer.
+  * Navigation never takes a button away from a stage that needs it, such as
+    the drum machine or clock master.
+* **Settings** are saved in NVS (the ESP32's flash key-value store) and
+  restored at boot. Saves are delayed by 2 s so a burst of taps causes one
+  flash write.
+* **Memory.** The code and core logic of all stages fit easily: stage 1 uses
+  8% of flash. Large buffers go in PSRAM (8 MB): full-screen sprites, the
+  Push 2 frame, the looper. Recordings and SysEx files go to the SD card.
+* **Timing.** The screen, the USB host module and the SD card share one SPI
+  bus. Clock-accurate stages (8, 12, 20) will move MIDI and clock handling to
+  the second CPU core so screen redraws can't delay them.
+* **BLE and Wi-Fi** (stages 17 and 18) each fit, but running both at once uses
+  most of the internal RAM. Expect them to be separate modes.
+
+### LED bar (M5GO Bottom2)
+
+There are 10 SK6812 RGB LEDs on GPIO25, as two strips of 5, one along each
+side of the base. M5Unified drives them through the ESP32's RMT peripheral
+(hardware-timed, so updates don't affect MIDI timing). OxiMate configures all
+10; M5Unified only sets up 1 on the Core2. Updates run at about 60 fps or
+less.
+
+* **Default (input activity).** LEDs 0–4 flash for USB input, LEDs 5–9 for
+  DIN input. Verify which physical side is which.
+  * Note-on: colour by pitch class (C = red, around the colour wheel to B),
+    brightness by velocity.
+  * Other channel messages: dim white. SysEx: magenta.
+  * Each flash fades out in about 100 ms.
+* **Brightness** is a setting: off, low, medium or high. At full brightness
+  the 10 LEDs draw up to about 0.5 A, so the medium level is capped at about
+  1/8 of full.
+* **Later modes take the LEDs over:**
+  * Clock master: beat pulse, with a different colour on the downbeat; bar
+    position on one side and phrase position on the other.
+  * Clock analyser: green when stable, yellow when jittery, red when the clock
+    drops out.
+  * Sequencers, drum machine and DFAM: the playhead (8 steps map one-to-one
+    onto the DFAM).
+  * Euclidean sequencer: hits around the "ring" of 10 LEDs.
+  * Per-channel activity for channels 1–10.
+  * VU or CC bar meters, a colour per mode, battery level, a connection
+    "breathing" light, a pulsing red light while recording, and warnings
+    (stuck note, SysEx overflow).
+
 ## Stage 1: MIDI monitor and merge
 
 ### MIDI routing
@@ -120,6 +192,43 @@ Every input goes to every output, except back to the port it came from:
   while paused. **C**: show or hide Clock and Active Sensing in the log.
 * Every logged line is also printed on the serial port at 115200 baud.
 
+## Stage 2: Router and LEDs
+
+### Router page
+
+```
+┌────────────────────────────────────────┐
+│Router>  USB 1C75:0288   DIN 120.0 PLAY │  tap the header: next page
+│ [USB>DIN]   [DIN>DIN]    [DIN>USB]     │  routes (tap to toggle)
+│ USB in channels                        │
+│ [1][2][3][4][5][6][7][8]               │  tap a channel to pass or block it
+│ [9][10]...         [16]                │
+│ DIN in channels                        │
+│ [1]...                                 │
+│ [Clk both][SysEx on][USB>keep][DIN>keep]
+│   All ch       LEDs:med     Defaults   │  touch buttons A / B / C
+└────────────────────────────────────────┘
+```
+
+* **Routes**: turn USB→DIN, DIN→DIN (software thru) and DIN→USB on or off
+  individually.
+* **Channel filter** per input: blocked channels are dropped before routing.
+* **Clock**: forward clock and transport (F8, FA, FB, FC, F2) from both
+  inputs, USB only, DIN only, or neither. Two clock sources merged together
+  would double the tempo, so choose one when both inputs send clock.
+* **SysEx**: forward it or not.
+* **Force channel** per input (`USB>keep` / `USB>ch5`): rewrites the channel
+  of every channel message from that input. Each tap moves to the next value:
+  keep → 1 → … → 16 → keep.
+* Buttons: **A** turns all channels back on, **B** cycles the LED brightness,
+  **C** restores the default settings.
+* The Monitor shows every input message. Lines for messages the router drops
+  are shown in grey.
+* **SAM2695 caveat:** the synth chip and DIN OUT are wired to the same Core2
+  output (see Unit MIDI wiring), so anything sent to the synth also reaches
+  DIN OUT. Setting the SAM2695 voice is therefore part of stage 6, which
+  covers this.
+
 ## Stage 3: Oxi One remote (notes)
 
 * Goal: put the Oxi One into remote-control mode, update its display, and map
@@ -149,57 +258,73 @@ Every input goes to every output, except back to the port it came from:
 * Plan: enumerate the Push and log its input → light LEDs on pad press → step
   sequencer → control-surface mode.
 
-## More ideas for this hardware
+## Stages 5–19: notes
 
-Ideas that stay on the music and MIDI theme, using the LEDs, the touch screen,
-the motion sensor and the SAM2695.
+* **5 Drum machine.** General MIDI drums on channel 10, with the pattern
+  mirrored to DIN OUT so external drums can follow. The 10 LEDs show the
+  playhead and the bar position.
+* **6 Preview synth.** Pick a channel and a GM program; the monitor routes
+  that channel to the SAM2695 only.
+* **8 Clock master.** Tap tempo on the touch screen or by tapping the case
+  (IMU). Swing and per-output clock dividers or multipliers. LED pulse on each
+  beat, in a different colour on the downbeat.
+* **9 Clock analyser.** Useful for checking M8 or Oxi One sync. Shows
+  min/avg/max tick interval and BPM drift.
+* **11 MIDI effects.** Applied in the merge path between input and output, so
+  they combine with the router (stage 2).
+* **13 Recorder, 14 SysEx librarian.** Both use the Core2 SD card. The
+  Subharmonicon `.syx` files in `subH_sysex_user/` are the first test case for
+  the librarian.
+* **17 BLE MIDI.** The ESP32 supports BLE MIDI natively, and the
+  `BLE-MIDI`/NimBLE libraries are already installed.
 
-**With the SAM2695 synth (128 General MIDI sounds and a drum kit)**
-* **Pocket drum machine**: a 16-step touch grid plays the GM drum kit on
-  channel 10. The LED bar shows the playhead, and the pattern is also sent to
-  DIN OUT.
-* **Touch instrument**: an on-screen keyboard or XY pad mapped to note and
-  filter cutoff. The IMU adds tilt-to-pitch-bend or modulation, and the
-  vibration motor gives feedback on note-on.
-* **Preview synth for the monitor**: hear any incoming channel on the SAM2695
-  while debugging a rig, with the instrument chosen on screen.
-* **Ear trainer or chord explorer**: play intervals or chords on the SAM2695
-  and answer on the touch screen.
+## Stage 20: Moog DFAM MIDI-to-CV (feasibility notes)
 
-**Clock and timing**
-* **Clock master**: tap tempo (touch or IMU tap), swing, start/stop, and clock
-  dividers or multipliers per output. Pulse the LED bar on each beat and use a
-  different colour on the downbeat.
-* **Clock analyser**: measure the jitter and drift of incoming clock (useful
-  for checking the M8 or Oxi sync).
-* **Haptic metronome**: the vibration motor pulses on the beat, for
-  headphone-free practice.
+The DFAM has no MIDI, but its patch bay has CV and gate inputs: Trigger, VCA
+CV, Velocity, VCA Decay, External Audio, VCF Decay, Noise Level, VCO Decay,
+VCF Mod, VCO 1 CV, 1→2 FM Amount, VCO 2 CV, Tempo, Run/Stop and Adv/Clock.
 
-**MIDI effects in the merge path**
-* Arpeggiator, chord generator, scale quantiser, transpose, velocity curves,
-  note and channel filters, channel remapping, and CC smoothing or scaling.
-* **Generative sequencers**: Euclidean rhythms, or a looping random sequence
-  that slowly mutates.
+**Playing a specific step (1–8).** The DFAM has no "go to step N" input.
+OxiMate can keep track of the current step and, on a MIDI note, send a fast
+burst of pulses to **ADV/CLOCK** to reach the target step. For example, notes
+C1–G1 select steps 1–8. Things to test on real hardware:
 
-**Storage and utilities (SD card)**
-* **MIDI recorder and looper**: record the merged stream and save or play it
-  back as `.mid` files.
-* **SysEx librarian**: send `.syx` files from the SD card, such as the
-  Subharmonicon files in `subH_sysex_user/`, and capture SysEx dumps from
-  devices.
-* **Setlist and scene recall**: send program changes and CC snapshots to
-  multiple devices from one touch.
-* **Panic and diagnostics**: All Notes Off on every channel, a stuck-note
-  detector, and per-channel activity on the 10 LEDs.
+* Do the skipped steps sound? A burst well under a millisecond may only be
+  heard as the last step.
+* How to get back in sync after the front-panel ADVANCE button is pressed:
+  a "set step 1" button on OxiMate, or a reset via Run/Stop if that resets
+  the sequence.
 
-**Wireless**
-* **BLE MIDI bridge**: connect wirelessly to an iPad or Mac (the ESP32
-  supports BLE MIDI).
-* **Network MIDI (RTP-MIDI / AppleMIDI)** over Wi-Fi.
+**Modulation.** MIDI CCs drive CV inputs such as VCF Mod, Decays, Noise Level,
+VCA CV and Velocity. Note velocity can drive the Velocity input.
 
-**More controls**
-* Add M5 units over Grove, such as 8-Encoder, Dual Button or Angle units, for
-  physical knobs and buttons alongside the touch buttons.
+**Hardware.** The Core2 alone is not enough:
+
+* The ESP32's built-in DACs are 8-bit and 0–3.3 V. GPIO25 drives the LED bar,
+  so only GPIO26 (Port B) is free. That is good enough for one rough
+  modulation CV, but not for pitch.
+* GPIO gates are 3.3 V. Moog's semi-modular trigger inputs expect about
+  +3.2 V or more (the Mother-32 figure), which leaves almost no margin. Buffer
+  gates to 5 V.
+* Recommended: a small CV board on I2C (Port A), for example an **MCP4728**
+  (4 × 12-bit DAC) with op-amp scaling to the DFAM's ±5 V range. 12 bits gives
+  2.4 mV steps over ±5 V, about 1/30 of a semitone, which is fine for 1 V/oct
+  pitch once it's calibrated. Add 2–3
+  transistor gate buffers (ADV/CLOCK, Run/Stop, Trigger) driven from free
+  GPIOs. An off-the-shelf alternative is the M5Stack **DAC 2 Unit** (GP8413,
+  2 × 15-bit, 0–5/0–10 V on I2C). It gives unipolar CVs only, so you'd still
+  need buffers for the gates.
+* Before wiring anything, check the exact input ranges in the DFAM manual.
+  A Moog forum user reports that some gate inputs only accept 0–5 V.
+
+**Plan:** prototype the step jump with one buffered gate on ADV/CLOCK first.
+If skipping is inaudible and sync is reliable, build the MCP4728 CV board.
+
+Sources:
+[DFAM spec listing](https://reverb.com/ca/p/moog-dfam-drummer-from-another-mother-analog-percussion-synthesizer),
+[Moog forum: DFAM voltages](https://forum.moogmusic.com/viewtopic.php?p=179088),
+[Moog forum: Run/Stop and ADV/CLK](https://forum.moogmusic.com/viewtopic.php?p=186955),
+[Mother-32 manual: clock input](https://www.manualslib.com/manual/988819/Moog-Mother-32.html?page=47).
 
 ## Build and upload
 
@@ -227,7 +352,11 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/midi_message.h`| `MidiMessage`, the common type for complete messages |
 | `src/usb_midi.*`    | USB host: USB-MIDI packets ⇄ messages, including SysEx assembly |
 | `src/din_midi.*`    | DIN serial: byte stream (running status, realtime) ⇄ messages |
-| `src/monitor.*`     | the monitor display |
+| `src/monitor.*`     | the Monitor page |
+| `src/router.*`      | filtering, remapping, routing; settings saved in NVS |
+| `src/leds.*`        | GO Bottom2 LED bar |
+| `src/clock_tracker.h` | BPM and transport per input |
+| `src/ui.*`          | page switching, header and footer |
 
 ## Credits
 
