@@ -20,20 +20,20 @@ synth.
 |---|-------|:-----------:|--------|
 | 1 | [MIDI monitor + merge](#stage-1-midi-monitor--merge) | ✅ | needs hardware test |
 | 2 | [Router + LEDs](#stage-2-router--leds) | ✅ | needs hardware test |
-| 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | planned |
-| 4 | [Push 2 host](#stage-4-push-2-host) | — | planned |
-| 5 | [Drum machine](#stage-5-drum-machine) | — | idea |
-| 6 | [Preview synth](#stage-6-preview-synth) | — | idea |
-| 7 | [Ear trainer](#stage-7-ear-trainer) | — | idea |
-| 8 | [Clock master](#stage-8-clock-master) | — | idea |
-| 9 | [Clock analyser](#stage-9-clock-analyser) | — | idea |
+| 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | planned (full plan) |
+| 4 | [Push 2 host](#stage-4-push-2-host) | — | planned (full plan) |
+| 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
+| 6 | [Preview synth](#stage-6-preview-synth) | — | planned (full plan) |
+| 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
+| 8 | [Clock master](#stage-8-clock-master) | — | planned (full plan) |
+| 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | idea |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | idea |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | idea |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | idea |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | idea |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | idea |
-| 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | — | idea |
+| 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | — | planned (full plan) |
 | 17 | [BLE MIDI](#stage-17-ble-midi) | — | idea |
 | 18 | [Network MIDI](#stage-18-network-midi) | — | idea |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | idea |
@@ -145,6 +145,36 @@ less.
     "breathing" light, a pulsing red light while recording, and warnings
     (stuck note, SysEx overflow).
 
+## Shared infrastructure
+
+The stage plans were written separately. These shared pieces apply to all of
+them. Where a stage plan says something different, this section wins. Each
+piece is built by the first stage that needs it.
+
+| Piece | Owner | What it is |
+|-------|-------|------------|
+| MIDI task on core 0 | 8 | 1 ms polling of USB/DIN, router, clock engine; UI stays on core 1; ring buffers between them; SPI bus mutex |
+| `MidiOutputs` | 16 | the **only** send path, used by the router and every generator; feeds the note tracker and TX listeners; DIN realtime priority (8); `sendRaw` |
+| `NoteTracker` | 16 | held/sustained notes per output and channel as sent; panic and auto-release |
+| `Origin` | 16 | who caused a message: `UsbIn`, `DinIn` or `Internal(owner stage)`. This replaces the `MidiSource::Internal` + `Router::sendInternal()` proposals in stages 3, 4 and 5 |
+| `MidiMessage::timeMicros` | 9 | timestamp taken at the input |
+| Input interceptors | 3, 4 | modules that **consume** a device's input before routing (Oxi remote, Push 2) |
+| Input observers | 7, 9 | pages and modules that **watch** input after routing (trainer, analyser) |
+| LED claims | all | a mode claims a range of LEDs (`claim(owner, first, count)`, `setPixel`, `clear`, `release`). Unclaimed LEDs show input activity. Stage 16 warnings overlay everything |
+| `ClockEngine` | 8 | the only source of outgoing clock and transport |
+| `SamSynth` | 6 | the only code that talks to the SAM2695; stages claim parts |
+| `StepSequencer` | 4 | pattern/step core shared by the Push 2 sequencer and the drum machine |
+
+**Channel 16 is reserved** for SAM2695 settings (stage 6). The ear trainer
+defaults to channel 15. The Oxi encoder CCs use the M8's control channel.
+
+**Suggested build order:** first the stage 8 timing core (its milestones 1–2)
+and the stage 16 output layer (its milestone 1). These are the foundation.
+After that: 6 → 5 and 7 → 3 → 4 → 9 and the rest of 8 and 16. The
+hardware checks are independent and can be done now with the stage 2
+firmware: the Oxi protocol check (stage 3, M0) and the Push 2 full-speed
+test (stage 4, M0).
+
 ## Stages
 
 ### Stage 1: MIDI monitor + merge
@@ -236,64 +266,140 @@ bar behaviour is described under Architecture.
 
 ### Stage 3: Oxi One remote
 
-* Goal: put the Oxi One into remote-control mode, update its display, and map
-  its button and encoder input to MIDI commands for the M8.
-* Open question: does remote mode replace the Oxi's normal behaviour, or run
-  alongside it?
-* Needed: the Oxi One remote-mode SysEx specification.
+Turn the Oxi One into a control surface for the M8: OxiMate puts the Oxi
+into remote mode, drives its grid LEDs, button LEDs and screen, and
+translates its pads, buttons and encoders into M8 MIDI.
+
+* **Protocol is public:** OXI's Remote Control Reference spreadsheet (MK1 and
+  MKII). Messages start with `F0 00 21 5B <model> 01`; values are sent as
+  nibbles; Oxi input comes back as plain notes/CCs on channels 1–2.
+  Milestone 0 checks it against your firmware before anything else.
+* **M8 side:** buttons and mute/solo as notes on the M8's control channel
+  (community-documented; the M8 has no official chart), encoders as CCs you
+  MIDI-learn in the M8, and a playable keyboard plus mute/solo rows on the grid.
+* **Connection:** the Oxi takes the USB host port, so the M8 connects over
+  TRS/DIN. The M8 doesn't report mutes back; a Sync button re-sends state.
+* New files: `oxi_protocol.h`, `oxi_remote.*`, `oxi_m8.*`, `oxi_page.*`.
+
+**Full plan:** [docs/stages/stage-3.md](docs/stages/stage-3.md)
 
 ### Stage 4: Push 2 host
 
-* The Push 2 has no standalone mode, so it needs a host. OxiMate would be that
-  host.
-* Pads, buttons, encoders, the touch strip and all LEDs work over standard USB
-  MIDI. The protocol is documented in Ableton's `push-interface` repository on
-  GitHub.
-  * The 8×8 pads are notes 36–99 with velocity and aftertouch. Set an LED's
-    colour by sending a note-on whose velocity picks a palette entry.
-  * Buttons are CCs. Encoders send relative CCs and report touch. The touch
-    strip sends pitch bend.
-  * The Push has two ports, Live and User (USB cables), selected with SysEx.
-* The Push's display is not driven over MIDI. Each frame is about 300 KB of
-  pixel data (960×160) sent over a separate USB channel. The MAX3421E runs at
-  USB full speed over SPI, so expect about 1 frame per second at best. Use the
-  Core2 screen for status instead.
-* The Push 2 needs its own power supply, because the USB host module can't
-  power it.
-* Plan: enumerate the Push and log its input → light LEDs on pad press → step
-  sequencer → control-surface mode.
+Use an Ableton Push 2 as a step sequencer and control surface, with OxiMate
+as its host.
+
+* **Go/no-go first:** the USB host module only does full speed; whether the
+  Push 2 works at full speed is undocumented. Milestone 0 tests it with the
+  stage 2 firmware and the Push's own power supply.
+* Uses the Push's **Live port** in its default mode; the USB MIDI driver
+  already ignores the display interface. Full MIDI map, LED palette and
+  animation SysEx are in the plan.
+* **Sequencer:** 8 tracks (drum or melodic), 64 steps, note/velocity/length/
+  probability per step, 16 patterns, driven by stage 8's clock engine. Its
+  core, `src/step_sequencer.*`, is reused by stage 5.
+* **Play mode:** keyboard pads, encoders as CCs, touch strip.
+* LED updates are batched and only sent on change. The Push display stays
+  dark (one frame takes 0.5–1 s at full speed); an optional experiment only.
+* DIN→USB is switched off while a Push is connected.
+
+**Full plan:** [docs/stages/stage-4.md](docs/stages/stage-4.md)
 
 ### Stage 5: Drum machine
 
-A 16-step touch grid plays the SAM2695's General MIDI drum kit on channel 10.
-The pattern is mirrored to DIN OUT so external drums can follow. The LED bar
-shows the playhead and the bar position.
+A touch-screen drum machine playing the SAM2695 drum kits (and DIN OUT) on
+channel 10.
+
+* 8 lanes × 16 steps; each step off, on or accent; 16 patterns per bank;
+  queued pattern switches and chaining; swing from the clock engine.
+* **UI:** one lane at a time as 16 large pads with an overview of all lanes
+  below (an 8×16 grid of tappable cells doesn't fit a 2" screen). Grid,
+  Sound and Pattern views. Buttons: A Play/Stop, B Mute, C View.
+* **LED bar:** left strip = beat 1–4, right strip = 16th within the beat.
+* Note-offs half a step after each hit, registered with the note tracker.
+* Built on stage 4's `step_sequencer`; bank in NVS, banks as JSON on SD.
+* Drums always go to both SAM2695 and DIN OUT in Separate mode (wiring);
+  Bypass mode is the documented "synth only" option.
+
+**Full plan:** [docs/stages/stage-5.md](docs/stages/stage-5.md)
 
 ### Stage 6: Preview synth
 
-Hear any incoming channel on the SAM2695: pick a channel and a GM program
-(instrument) on screen. This includes setting the SAM2695 voice, which moved
-here from stage 2. The synth chip and DIN OUT share the same output, so
-program changes for the synth also reach external gear. Use a channel the
-external gear ignores.
+Control the SAM2695 synth and preview any input on it, without disturbing
+external gear on DIN OUT.
+
+* **Solves the shared-wire problem:** a GS SysEx (from the datasheet)
+  assigns each synth part to a channel or mutes it. The synth then plays
+  only the channels you pick ("listen map"). Instrument, volume and effect
+  settings go out on a reserved **settings channel 16**, which external gear
+  should not use.
+* **`src/sam_synth.*`:** stages claim synth parts instead of hard-coding
+  channels, then set program, volume and effects and audition notes. State is
+  re-sent at boot and after any reset that reaches DIN OUT.
+* **Synth page:** 4 melodic layers plus a drum layer; GM browser by family,
+  the MT-32 bank and drum kits. A/C = −/+, B = Browse/Test.
+* The bundled M5-SAM2695 library is not used: two of its SysEx messages are
+  wrong and its `reset()` sends System Reset to all gear. Bytes go out raw.
+* Settings in NVS under their own key (`synth`).
+
+**Full plan:** [docs/stages/stage-6.md](docs/stages/stage-6.md)
 
 ### Stage 7: Ear trainer
 
-Play intervals and chords on the SAM2695 and answer on the touch screen. The
-LEDs flash green for a correct answer and red for a wrong one.
+Two pages for ear training on the SAM2695.
+
+* **Ear trainer:** intervals, chord qualities, scale degrees and melody
+  echo; four levels plus auto-level; weak spots come up more often. Answer
+  by tapping or by playing on a USB/DIN keyboard (any octave counts).
+* **Chord explorer:** pick root, type and inversion to hear and see a chord;
+  chords played on a keyboard are named.
+* Notes play on a claimed synth part, default **channel 15**. Gear listening
+  on that channel (or in omni mode) also plays them; use Bypass mode then.
+* A small local note scheduler handles playback (questions don't follow
+  transport or swing). LEDs flash green/red and show the streak.
+* Theory and trainer logic are plain C++ and unit-tested on the Mac.
+
+**Full plan:** [docs/stages/stage-7.md](docs/stages/stage-7.md)
 
 ### Stage 8: Clock master
 
-Internal MIDI clock with tap tempo (touch the screen or tap the case, via the
-IMU), swing, start/stop, and clock dividers or multipliers per output. The LED
-bar pulses on each beat, in a different colour on the downbeat, and shows the
-bar position.
+Internal MIDI clock, and the **timing architecture every later stage uses**.
+
+* **MIDI task on core 0:** high priority, woken by a hardware timer, polls
+  USB and DIN every 1 ms and runs router and clock engine. The UI stays in
+  `loop()` on core 1. Lock-free ring buffers carry events to the UI and
+  config snapshots back.
+* **Shared SPI bus:** one mutex; the MIDI task only try-locks; the Monitor
+  pushes its screen in 4 bands so the bus is never held more than ~3 ms.
+* **DIN output:** realtime bytes get priority, so clock is delayed at most
+  ~1.6 ms.
+* **`ClockEngine`:** internal or follow USB/DIN (lock/lost detection), tap
+  tempo (touch or IMU tap), swing on step events only (MIDI clock stays
+  straight), per-output dividers/multipliers, sub-tick scheduler, listener
+  events (tick, step, beat, bar, transport).
+* **Single clock owner:** the engine becomes the only sender of clock and
+  transport; `RouterConfig` v2 migrates the old clock setting;
+  `ClockTracker` is retired.
+* **Clock page:** big BPM, source chips, outputs view. A Start/Stop, B Tap,
+  C Outputs.
+
+**Full plan:** [docs/stages/stage-8.md](docs/stages/stage-8.md)
 
 ### Stage 9: Clock analyser
 
-Measure the jitter and drift of incoming MIDI clock: min/avg/max tick
-interval and BPM drift. Useful for checking M8 or Oxi One sync. The LEDs show
-green when stable, yellow when jittery and red when the clock drops out.
+Measure the quality of incoming MIDI clock on USB and DIN.
+
+* Tick interval min/avg/max, jitter (std dev and histogram), BPM now and
+  averaged, drift, dropouts, transport and song-position checks,
+  double-clock detection, USB vs DIN phase.
+* **Timestamps must improve first:** today they're taken after `loop()`
+  polls, so a screen redraw adds up to ~15 ms of error (a tick at 120 BPM
+  is 20.8 ms). Fix: `MidiMessage::timeMicros`, DIN bytes stamped on arrival
+  (~320 µs constant offset, < 50 µs spread), USB stamped per transfer in
+  stage 8's 1 kHz task (±1 ms).
+* Four views: Stats, Histogram, Drift, Phase. LEDs green < 0.5 ms jitter,
+  yellow above, red on dropout. CSV over serial.
+
+**Full plan:** [docs/stages/stage-9.md](docs/stages/stage-9.md)
 
 ### Stage 10: Haptic metronome
 
@@ -327,8 +433,23 @@ Send program changes and CC snapshots to several devices with one touch.
 
 ### Stage 16: Panic & diagnostics
 
-All Notes Off on every channel, a stuck-note detector, and per-channel
-activity on the LEDs (channels 1–10).
+Get out of stuck-note situations quickly, and see what's going on.
+
+* **`MidiOutputs` + `NoteTracker`:** one send path for the router and every
+  generator; the tracker records held and sustained notes per output and
+  channel *as sent* (after remapping), with who caused them. ~3.2 KB.
+* **Panic:** level 1 = note-offs for tracked notes; level 2 adds CC123,
+  CC120 and CC64=0 on all channels; level 3 adds all 128 notes × 16
+  channels (~1.3 s on DIN, non-blocking).
+* **Trigger:** power button. Short press = levels 1+2, ~1.5 s hold =
+  level 3 (a 6 s hold still powers off). Fallbacks: header hold, button C on
+  the Diagnostics page.
+* **Automatic release:** on USB disconnect, Active Sensing timeout, and
+  before a router change takes effect. Stuck-note warning after 30 s.
+* **Diagnostics page:** channel activity, message counters and rates, DIN
+  TX buffer, dropped SysEx, USB errors, heap/PSRAM, battery.
+
+**Full plan:** [docs/stages/stage-16.md](docs/stages/stage-16.md)
 
 ### Stage 17: BLE MIDI
 
