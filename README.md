@@ -16,28 +16,28 @@ synth.
 
 ## Roadmap
 
-| # | Stage | Status |
-|---|-------|--------|
-| 1 | **MIDI monitor + merge**: show all incoming MIDI and merge USB and DIN inputs to DIN OUT | done, untested on hardware |
-| 2 | **Router + LEDs**: set up routing, channel filters and remapping on the device, save the settings, and show input activity on the LED bar | in progress |
-| 3 | **Oxi One remote**: put the Oxi One in remote mode and use it as a control surface for the M8 | planned |
-| 4 | **Push 2 host**: use an Ableton Push 2 as a control surface and step sequencer, like the Oxi One | planned |
-| 5 | **Pocket drum machine**: a 16-step touch grid plays the SAM2695 drum kit, with the playhead on the LED bar | idea |
-| 6 | **Monitor preview synth**: hear any incoming channel on the SAM2695, with the instrument chosen on screen (includes setting the SAM2695 voice, moved here from stage 2) | idea |
-| 7 | **Ear trainer / chord explorer**: play intervals and chords on the SAM2695 and answer on the touch screen | idea |
-| 8 | **Clock master**: tap tempo, swing, start/stop and clock dividers, with the LED bar pulsing on the beat | idea |
-| 9 | **Clock analyser**: measure the jitter and drift of incoming MIDI clock | idea |
-| 10 | **Haptic metronome**: the vibration motor pulses on the beat | idea |
-| 11 | **MIDI effects**: arpeggiator, chords, scale quantiser, transpose, velocity curves, CC scaling | idea |
-| 12 | **Generative sequencers**: Euclidean rhythms, and a looping random sequence that slowly mutates | idea |
-| 13 | **MIDI recorder / looper**: record the merged stream to SD card as `.mid` files and play it back | idea |
-| 14 | **SysEx librarian**: send `.syx` files from SD card and capture SysEx dumps | idea |
-| 15 | **Setlist / scene recall**: send program changes and CC snapshots to several devices with one touch | idea |
-| 16 | **Panic & diagnostics**: All Notes Off, a stuck-note detector, per-channel activity on the LEDs | idea |
-| 17 | **BLE MIDI bridge**: wireless MIDI to and from an iPad or Mac | idea |
-| 18 | **Network MIDI**: RTP-MIDI / AppleMIDI over Wi-Fi | idea |
-| 19 | **More controls**: add M5 Grove units (8-Encoder, Dual Button, Angle) as physical knobs and buttons | idea |
-| 20 | **DFAM MIDI-to-CV**: play the Moog DFAM's 8 steps from MIDI notes and drive its CV inputs from CCs (needs a small CV board) | idea |
+| # | Stage | Implemented | Status |
+|---|-------|:-----------:|--------|
+| 1 | **MIDI monitor + merge**: show all incoming MIDI and merge USB and DIN inputs to DIN OUT | ✅ | needs hardware test |
+| 2 | **Router + LEDs**: set up routing, channel filters and remapping on the device, save the settings, and show input activity on the LED bar | — | in progress |
+| 3 | **Oxi One remote**: put the Oxi One in remote mode and use it as a control surface for the M8 | — | planned |
+| 4 | **Push 2 host**: use an Ableton Push 2 as a control surface and step sequencer, like the Oxi One | — | planned |
+| 5 | **Pocket drum machine**: a 16-step touch grid plays the SAM2695 drum kit, with the playhead on the LED bar | — | idea |
+| 6 | **Monitor preview synth**: hear any incoming channel on the SAM2695, with the instrument chosen on screen (includes setting the SAM2695 voice, moved here from stage 2) | — | idea |
+| 7 | **Ear trainer / chord explorer**: play intervals and chords on the SAM2695 and answer on the touch screen | — | idea |
+| 8 | **Clock master**: tap tempo, swing, start/stop and clock dividers, with the LED bar pulsing on the beat | — | idea |
+| 9 | **Clock analyser**: measure the jitter and drift of incoming MIDI clock | — | idea |
+| 10 | **Haptic metronome**: the vibration motor pulses on the beat | — | idea |
+| 11 | **MIDI effects**: arpeggiator, chords, scale quantiser, transpose, velocity curves, CC scaling | — | idea |
+| 12 | **Generative sequencers**: Euclidean rhythms, and a looping random sequence that slowly mutates | — | idea |
+| 13 | **MIDI recorder / looper**: record the merged stream to SD card as `.mid` files and play it back | — | idea |
+| 14 | **SysEx librarian**: send `.syx` files from SD card and capture SysEx dumps | — | idea |
+| 15 | **Setlist / scene recall**: send program changes and CC snapshots to several devices with one touch | — | idea |
+| 16 | **Panic & diagnostics**: All Notes Off, a stuck-note detector, per-channel activity on the LEDs | — | idea |
+| 17 | **BLE MIDI bridge**: wireless MIDI to and from an iPad or Mac | — | idea |
+| 18 | **Network MIDI**: RTP-MIDI / AppleMIDI over Wi-Fi | — | idea |
+| 19 | **More controls**: add M5 Grove units (8-Encoder, Dual Button, Angle) as physical knobs and buttons | — | idea |
+| 20 | **DFAM MIDI-to-CV**: play the Moog DFAM's 8 steps from MIDI notes and drive its CV inputs from CCs (needs a small CV board) | — | idea |
 
 Stage 2 was originally "send USB MIDI to the attached MIDI port". Stage 1
 already does that, so stage 2 is now about making the routing configurable.
