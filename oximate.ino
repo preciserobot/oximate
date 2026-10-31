@@ -24,44 +24,49 @@
  */
 #include <M5Unified.h>
 
+#include "src/clock_tracker.h"
 #include "src/din_midi.h"
+#include "src/leds.h"
 #include "src/monitor.h"
+#include "src/router.h"
+#include "src/router_page.h"
+#include "src/ui.h"
 #include "src/usb_midi.h"
-
-/*
- * MIDI merge routing (see README "MIDI routing").
- * Every input is sent to every output except back to where it came from.
- */
-constexpr bool kRouteUsbToDin = true; // USB device -> DIN OUT (+ SAM2695 synth)
-constexpr bool kRouteDinToDin = true; // DIN IN -> DIN OUT (software thru, merged with USB)
-constexpr bool kRouteDinToUsb = true; // DIN IN -> USB device
 
 UsbMidi usbMidi;
 DinMidi dinMidi;
+Router router;
+ClockTracker clockTracker;
+Leds leds;
+Ui ui;
 Monitor monitor;
+RouterPage routerPage(router, leds);
 
+/*! Every complete message from any input arrives here */
 void onMidi(const MidiMessage &msg)
 {
-  switch (msg.source) {
-    case MidiSource::Usb:
-      if (kRouteUsbToDin) dinMidi.send(msg);
-      break;
-    case MidiSource::Din:
-      if (kRouteDinToDin) dinMidi.send(msg);
-      if (kRouteDinToUsb) usbMidi.send(msg);
-      break;
-  }
-  monitor.log(msg);
+  bool forwarded = router.route(msg);
+  clockTracker.track(msg);
+  leds.activity(msg);
+  monitor.log(msg, forwarded);
 }
 
 void setup()
 {
   M5.begin();
   Serial.begin(115200);
+
+  ui.begin(clockTracker);
   monitor.begin();
+  ui.addPage(monitor);
+  ui.addPage(routerPage);
 
   // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2)
   dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
+  router.begin(dinMidi, usbMidi);
+
+  leds.begin();
+  leds.setLevel(router.config().ledLevel);
 
   if (!usbMidi.begin(onMidi)) {
     Serial.println("USB host init failed");
@@ -79,10 +84,8 @@ void loop()
   dinMidi.poll();
 
   M5.update();
-  if (M5.BtnA.wasClicked()) monitor.clear();
-  if (M5.BtnB.wasClicked()) monitor.togglePause();
-  if (M5.BtnC.wasClicked()) monitor.toggleRealtime();
-
-  monitor.setUsbDevice(usbMidi.connected(), usbMidi.vendorId(), usbMidi.productId());
-  monitor.draw();
+  ui.setUsbDevice(usbMidi.connected(), usbMidi.vendorId(), usbMidi.productId());
+  ui.poll();
+  leds.update();
+  router.poll();
 }

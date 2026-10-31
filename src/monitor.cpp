@@ -1,13 +1,8 @@
 #include "monitor.h"
 
-static constexpr int kHeaderHeight = 20;
-static constexpr int kLogTop = 22;
-static constexpr int kFooterTop = 222;
-static constexpr int kCharHeight = 16;
+using namespace Layout;
 
-static constexpr uint16_t kUsbColor = TFT_CYAN;
-static constexpr uint16_t kDinColor = TFT_ORANGE;
-static constexpr uint16_t kBarColor = TFT_NAVY;
+static constexpr uint16_t kFilteredColor = TFT_DARKGREY;
 
 static const char *const kNoteNames[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -68,61 +63,26 @@ void describeMidi(const MidiMessage &msg, char *out, size_t size)
 
 void Monitor::begin()
 {
-  M5.Display.fillScreen(TFT_BLACK);
   _canvas.setColorDepth(8);
   _canvas.createSprite(M5.Display.width(), kLines * kCharHeight);
   _canvas.setFont(&fonts::AsciiFont8x16);
   _canvas.setTextWrap(false);
-  M5.Display.setFont(&fonts::AsciiFont8x16);
-  M5.Display.setTextWrap(false);
 }
 
-void Monitor::log(const MidiMessage &msg)
+void Monitor::log(const MidiMessage &msg, bool forwarded)
 {
-  trackClock(msg);
   if (_paused) {
     return;
   }
-  // Clock and active sensing would flood the log; they are summarised in the header instead
+  // Clock and active sensing would flood the log; the header shows the clock instead
   if ((msg.status() == 0xF8 || msg.status() == 0xFE) && !_showRealtime) {
     return;
   }
   char text[kLineLength];
   describeMidi(msg, text, sizeof(text));
-  addLine(msg.source == MidiSource::Usb ? kUsbColor : kDinColor, text);
+  uint16_t color = msg.source == MidiSource::Usb ? kUsbColor : kDinColor;
+  addLine(forwarded ? color : kFilteredColor, text);
   Serial.println(text);
-}
-
-void Monitor::trackClock(const MidiMessage &msg)
-{
-  ClockState &clock = _clock[(int)msg.source];
-  uint32_t now = micros();
-  switch (msg.status()) {
-    case 0xF8:
-      clock.lastTickMillis = millis();
-      if (clock.ticks == 0) {
-        clock.beatStartMicros = now;
-      } else if (clock.ticks == 24) { // 24 ticks per quarter note
-        clock.bpm = 60e6f / (now - clock.beatStartMicros);
-        clock.beatStartMicros = now;
-        clock.ticks = 0;
-      }
-      clock.ticks++;
-      break;
-    case 0xFA:
-      clock.ticks = 0;
-      clock.running = true;
-      _headerDirty = true;
-      break;
-    case 0xFB:
-      clock.running = true;
-      _headerDirty = true;
-      break;
-    case 0xFC:
-      clock.running = false;
-      _headerDirty = true;
-      break;
-  }
 }
 
 void Monitor::addLine(uint16_t color, const char *text)
@@ -133,98 +93,34 @@ void Monitor::addLine(uint16_t color, const char *text)
   line.text[kLineLength - 1] = '\0';
   _head = (_head + 1) % kLines;
   if (_count < kLines) _count++;
-  _logDirty = true;
+  markDirty();
 }
 
-void Monitor::setUsbDevice(bool connected, uint16_t vid, uint16_t pid)
+void Monitor::buttonLabels(const char *labels[3]) const
 {
-  if (connected != _usbConnected || vid != _usbVid || pid != _usbPid) {
-    _usbConnected = connected;
-    _usbVid = vid;
-    _usbPid = pid;
-    _headerDirty = true;
+  labels[0] = "Clear";
+  labels[1] = _paused ? "Resume" : "Pause";
+  labels[2] = _showRealtime ? "Clock:on" : "Clock:off";
+}
+
+void Monitor::onButton(int index)
+{
+  switch (index) {
+    case 0:
+      _count = 0;
+      _head = 0;
+      markDirty();
+      break;
+    case 1:
+      _paused = !_paused;
+      break;
+    case 2:
+      _showRealtime = !_showRealtime;
+      break;
   }
-}
-
-void Monitor::clear()
-{
-  _count = 0;
-  _head = 0;
-  _logDirty = true;
-}
-
-void Monitor::togglePause()
-{
-  _paused = !_paused;
-  _footerDirty = true;
-}
-
-void Monitor::toggleRealtime()
-{
-  _showRealtime = !_showRealtime;
-  _footerDirty = true;
 }
 
 void Monitor::draw()
-{
-  uint32_t now = millis();
-  if (now - _lastFrame < kFrameMillis) {
-    return;
-  }
-  // The BPM readout changes without any line being logged
-  if (now - _lastHeader >= kHeaderMillis) {
-    _headerDirty = true;
-  }
-  if (!_logDirty && !_headerDirty && !_footerDirty) {
-    return;
-  }
-  _lastFrame = now;
-  M5.Display.startWrite();
-  if (_headerDirty) {
-    drawHeader();
-    _lastHeader = now;
-  }
-  if (_logDirty) drawLog();
-  if (_footerDirty) drawFooter();
-  M5.Display.endWrite();
-  _headerDirty = _logDirty = _footerDirty = false;
-}
-
-void Monitor::drawHeader()
-{
-  char usb[16];
-  if (_usbConnected) {
-    snprintf(usb, sizeof(usb), "USB %04X:%04X", _usbVid, _usbPid);
-  } else {
-    strcpy(usb, "USB --");
-  }
-
-  // Show the clock of whichever source ticked most recently
-  char clock[20] = "";
-  const ClockState *latest = nullptr;
-  int latestSource = 0;
-  for (int i = 0; i < 2; i++) {
-    const ClockState &c = _clock[i];
-    if (c.lastTickMillis && millis() - c.lastTickMillis < kClockTimeoutMillis &&
-        (!latest || c.lastTickMillis > latest->lastTickMillis)) {
-      latest = &c;
-      latestSource = i;
-    }
-  }
-  if (latest) {
-    snprintf(clock, sizeof(clock), "%s %5.1f %s", latestSource == (int)MidiSource::Usb ? "USB" : "DIN",
-             latest->bpm, latest->running ? "PLAY" : "STOP");
-  }
-
-  char text[kLineLength];
-  snprintf(text, sizeof(text), "OxiMate %-15s %s", usb, clock);
-  M5.Display.fillRect(0, 0, M5.Display.width(), kHeaderHeight, kBarColor);
-  M5.Display.setTextColor(TFT_WHITE, kBarColor);
-  M5.Display.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
-  M5.Display.print(text);
-}
-
-void Monitor::drawLog()
 {
   _canvas.fillScreen(TFT_BLACK);
   // Oldest line at the top, newest at the bottom
@@ -235,19 +131,5 @@ void Monitor::drawLog()
     _canvas.setCursor(0, (kLines - _count + i) * kCharHeight);
     _canvas.print(line.text);
   }
-  _canvas.pushSprite(0, kLogTop);
-}
-
-void Monitor::drawFooter()
-{
-  // Labels sit above the Core2 touch buttons A, B and C
-  const char *labels[3] = {"Clear", _paused ? "Resume" : "Pause", _showRealtime ? "Clock:on" : "Clock:off"};
-  const int centers[3] = {53, 160, 267};
-  M5.Display.fillRect(0, kFooterTop, M5.Display.width(), M5.Display.height() - kFooterTop, kBarColor);
-  M5.Display.setTextColor(_paused ? TFT_YELLOW : TFT_WHITE, kBarColor);
-  M5.Display.setTextDatum(top_center);
-  for (int i = 0; i < 3; i++) {
-    M5.Display.drawString(labels[i], centers[i], kFooterTop + 1);
-  }
-  M5.Display.setTextDatum(top_left);
+  _canvas.pushSprite(0, kContentTop);
 }
