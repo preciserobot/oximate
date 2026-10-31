@@ -1,6 +1,8 @@
 # Created By: zapTheGoose
 .PHONY: all build send
 
+PORT ?= /dev/cu.usbserial-58620052741
+
 all: build send
 
 libraries/USB_Host_Shield_2.0/.patched:
@@ -16,6 +18,6 @@ build: libraries/USB_Host_Shield_2.0/.patched
 
 send:
 	arduino-cli upload \
-		--port /dev/cu.usbserial-58620052741 \
+		--port $(PORT) \
 		--fqbn esp32:esp32:m5stack_core2
 
