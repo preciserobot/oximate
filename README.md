@@ -82,6 +82,12 @@ documentation is ambiguous on this point.
     setting for OxiMate.** DIN OUT then carries the merged stream.
   * **Bypass**: DIN OUT is a hardware thru of DIN IN. The Core2's output only
     reaches the SAM2695, so USB MIDI does not reach DIN OUT.
+* **If the SAM2695 goes silent:** corrupted or non-MIDI data (e.g. an Oxi One
+  set up for an Oxi Split) can leave it muted. It keeps that state until it
+  loses power, and the Core2's reset button doesn't cut its power. Power
+  everything off fully (unplug USB, hold the power button for 6 s), then test
+  with the Diag page's test note (hold B). Stage 6 will re-send the synth's
+  settings at boot to make this less likely.
 
 ### About the Core2's own USB-C port
 

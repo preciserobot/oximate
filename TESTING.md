@@ -22,11 +22,11 @@ Before starting: set the Unit MIDI's front switch to **Separate**.
 * [x] The start-up screen (red "oximate" banner) shows for about 3 s, then the Monitor page appears
 * [x] Swiping left/right switches pages: Monitor → Router → Clock → Diag (tapping the header also works)
 * [x] Notes from a USB keyboard show on the Monitor in cyan
-* [ ] Notes from DIN IN show on the Monitor in orange
-* [ ] Both inputs come out of DIN OUT
+* [x] Notes from DIN IN show on the Monitor in orange
+* [x] Both inputs come out of DIN OUT
 * [ ] Both inputs are audible on the SAM2695 (headphones on the Unit MIDI)
-* [ ] DIN IN notes reach the USB device
-* [ ] Monitor buttons: A clears, B pauses/resumes, C shows/hides clock messages
+* [x] DIN IN notes reach the USB device
+* [x] Monitor buttons: A clears, B pauses/resumes, C shows/hides clock messages
 * [x] LEDs flash on incoming notes
   > Which side lights up for USB, and which for DIN:
 * [ ] Playing fast on both inputs while switching pages: no missing notes, no stuck notes, no freezes
