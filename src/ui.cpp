@@ -22,23 +22,25 @@ void Ui::splash(const char *status)
   DisplayLock lock;
   static bool drawn = false;
   int w = M5.Display.width(), h = M5.Display.height();
-  if (!drawn) { // the box once; later calls only update the status line
+  if (!drawn) { // the banner once; later calls only update the status line
     drawn = true;
+    // Same banner as the original firmware: square red box, built-in pixel font at 4x,
+    // text sitting on the box's bottom edge
     M5.Display.fillScreen(TFT_BLACK);
-    M5.Display.fillRoundRect(30, 70, w - 60, 80, 10, TFT_RED);
-    M5.Display.setFont(&fonts::FreeSansBold24pt7b);
-    M5.Display.setTextColor(TFT_WHITE);
-    M5.Display.setTextDatum(middle_center);
-    M5.Display.drawString("OxiMate", w / 2, 108);
-    M5.Display.setFont(&fonts::AsciiFont8x16);
-    M5.Display.setTextColor(TFT_LIGHTGREY);
-    M5.Display.drawString("MIDI toolbox", w / 2, 172);
+    M5.Display.fillRect(30, 110, 260, 50, TFT_RED);
+    M5.Display.setFont(&fonts::Font0);
+    M5.Display.setTextSize(4);
+    M5.Display.setTextColor(TFT_WHITE, TFT_RED);
+    M5.Display.setCursor(40, 130);
+    M5.Display.print("oximate");
+    M5.Display.setTextSize(1);
   }
-  M5.Display.setFont(&fonts::AsciiFont8x16);
-  M5.Display.fillRect(0, h - 30, w, 20, TFT_BLACK);
-  M5.Display.setTextColor(TFT_DARKGREY);
-  M5.Display.setTextDatum(middle_center);
-  M5.Display.drawString(status, w / 2, h - 20);
+  M5.Display.setFont(&fonts::Font0);
+  M5.Display.setTextSize(1);
+  M5.Display.fillRect(0, h - 20, w, 12, TFT_BLACK);
+  M5.Display.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  M5.Display.setTextDatum(top_center);
+  M5.Display.drawString(status, w / 2, h - 18);
   M5.Display.setTextDatum(top_left);
 }
 
