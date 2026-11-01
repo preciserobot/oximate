@@ -20,7 +20,7 @@ synth.
 |---|-------|:-----------:|--------|
 | 1 | [MIDI monitor + merge](#stage-1-midi-monitor--merge) | ✅ | needs hardware test |
 | 2 | [Router + LEDs](#stage-2-router--leds) | ✅ | needs hardware test |
-| 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | planned (full plan) |
+| 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | deferred (M8 not available; needs Oxi protocol check over USB) |
 | 4 | [Push 2 host](#stage-4-push-2-host) | — | planned (full plan) |
 | 5 | [Drum machine](#stage-5-drum-machine) | ✅ | needs hardware test |
 | 6 | [Preview synth](#stage-6-preview-synth) | ✅ | needs hardware test |
