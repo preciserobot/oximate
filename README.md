@@ -23,7 +23,7 @@ synth.
 | 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | planned (full plan) |
 | 4 | [Push 2 host](#stage-4-push-2-host) | — | planned (full plan) |
 | 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
-| 6 | [Preview synth](#stage-6-preview-synth) | partly | synth chip control and Synth page done; speaker output to do; needs hardware test |
+| 6 | [Preview synth](#stage-6-preview-synth) | ✅ | needs hardware test |
 | 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
@@ -441,8 +441,13 @@ external gear on DIN OUT.
 * Shows a warning in Separate wiring that settings reach DIN gear.
 * Message encodings come from the datasheet; there are golden-byte tests in
   `make test`.
-* **Not built yet:** the built-in speaker output (software synth), per-layer
-  pan and chorus send, MT-32 instrument names, following program changes from
+* **Output: chip or built-in speaker** (Synth page, bottom row). In speaker
+  mode the chip is silenced and the Core2 plays the layer channels (All
+  mode: every channel, channel 10 as drums) and the test and preview sounds
+  through its own speaker, so previews send nothing to DIN. It has 8 voices,
+  one soft wave for every instrument, and simple blips for drums; the volume
+  follows the master volume.
+* **Not built yet:** per-layer pan and chorus send, MT-32 instrument names, following program changes from
   your gear on the page, and the Synth page LEDs.
 * Still to check on the hardware (TESTING.md section 6): a part keeps its
   program after being reassigned, the CM-64 kit number, and the voices
@@ -772,6 +777,7 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/sam_synth.*`  | SAM2695 control: part map, layers, effects, auditions, restore after resets |
 | `src/synth_page.*`  | the Synth page and instrument browser |
 | `src/gm_names.h`    | GM instrument names, families, drum kits |
+| `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |
 | `src/tap_tempo.h`   | tap tempo averaging |

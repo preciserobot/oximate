@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sam_synth.h"
+#include "speaker_synth.h"
 #include "ui.h"
 
 /*! Synth page (stage 6): what the SAM2695 plays and how it sounds.
@@ -9,7 +10,7 @@
 class SynthPage : public Page
 {
 public:
-  explicit SynthPage(SamSynth &synth) : _synth(synth) {}
+  SynthPage(SamSynth &synth, SpeakerSynth &speaker) : _synth(synth), _speaker(speaker) {}
 
   const char *title() const override { return "Synth"; }
   void buttonLabels(const char *labels[3]) const override;
@@ -21,7 +22,8 @@ public:
 
 private:
   // Cells: row 0 = mode / config channel / voices, rows 1-5 = layers (channel, instrument,
-  // volume, reverb), row 6 = master / reverb type / reverb level / chorus, row 7 = wiring / resend
+  // volume, reverb), row 6 = master / reverb type / reverb level / chorus,
+  // row 7 = wiring / output (chip or speaker) / resend
   struct Cell
   {
     int8_t row, col;
@@ -35,9 +37,11 @@ private:
   void drawBrowser();
   void instrumentText(const SynthLayer &layer, bool drums, char *out, size_t size) const;
   void openBrowser(int layer);
+  void test(int layer, uint8_t bank, uint8_t program, bool preview);
   void browserTouch(int x, int y);
 
   SamSynth &_synth;
+  SpeakerSynth &_speaker;
   Cell _selected = {1, 1};
 
   bool _browsing = false;

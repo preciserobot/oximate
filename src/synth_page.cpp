@@ -9,7 +9,8 @@ static constexpr int kTopY = 24, kTopH = 22;
 static constexpr int kTableHeaderY = 48;
 static constexpr int kLayerY = 64, kLayerH = 20;
 static constexpr int kGlobalY = 166, kGlobalH = 22;
-static constexpr int kWiringY = 192, kWiringH = 22;
+static constexpr int kWiringY = 192, kWiringH = 20, kWiringW = 107;
+static constexpr int kWarningY = 213;
 static constexpr int kLayerColX[5] = {0, 24, 80, 256, 288}; // label, channel, instrument, volume, reverb
 static constexpr int kLayerColW[4] = {56, 176, 32, 32};
 static constexpr int kTopColX[3] = {0, 120, 200}, kTopColW[3] = {120, 80, 120};
@@ -63,6 +64,18 @@ void SynthPage::changed()
   markDirty();
 }
 
+/*! Test chord or preview: on the chip, or on the built-in speaker in speaker mode */
+void SynthPage::test(int layer, uint8_t bank, uint8_t program, bool preview)
+{
+  if (_synth.config().speaker) {
+    _speaker.test(layer == SamSynth::kDrumLayer, SamSynth::kAuditionMillis);
+  } else if (preview) {
+    _synth.preview(layer, bank, program);
+  } else {
+    _synth.testLayer(layer);
+  }
+}
+
 void SynthPage::openBrowser(int layer)
 {
   const SynthLayer &l = _synth.config().layers[layer];
@@ -105,7 +118,7 @@ void SynthPage::onButton(int index)
       if (instrumentSelected()) {
         openBrowser(selectedLayer());
       } else if (selectedLayer() >= 0) {
-        _synth.testLayer(selectedLayer());
+        test(selectedLayer(), 0, 0, false);
       }
       break;
   }
@@ -186,8 +199,8 @@ void SynthPage::onTouch(int x, int y)
     cell = {(int8_t)(1 + (y - kLayerY) / kLayerH), col};
   } else if (y >= kGlobalY && y < kGlobalY + kGlobalH) {
     cell = {6, (int8_t)(x / 80)};
-  } else if (y >= kWiringY && y < kWiringY + kWiringH && x < 200) {
-    cell = {7, (int8_t)(x < 120 ? 0 : 1)};
+  } else if (y >= kWiringY && y < kWiringY + kWiringH) {
+    cell = {7, (int8_t)(x / kWiringW < 3 ? x / kWiringW : 2)};
   } else {
     return;
   }
@@ -201,6 +214,10 @@ void SynthPage::onTouch(int x, int y)
     c.bypass = !c.bypass;
     changed();
   } else if (cell.row == 7 && cell.col == 1) {
+    c.speaker = !c.speaker;
+    _speaker.allOff();
+    changed();
+  } else if (cell.row == 7 && cell.col == 2) {
     _synth.resend();
   } else if (again && instrumentSelected()) {
     openBrowser(selectedLayer());
@@ -215,7 +232,7 @@ void SynthPage::browserTouch(int x, int y)
     int index = (y - kListY + 2 * kListH) / kListH; // kits start higher: no family grid
     if (y >= kListY - 2 * kListH && index >= 0 && index < GmNames::kKitCount) {
       _browseProgram = GmNames::kKits[index].program;
-      _synth.preview(_browseLayer, 0, _browseProgram);
+      test(_browseLayer, 0, _browseProgram, true);
       markDirty();
     }
     return;
@@ -225,7 +242,7 @@ void SynthPage::browserTouch(int x, int y)
     markDirty();
   } else if (y >= kListY && y < kListY + 8 * kListH) {
     _browseProgram = _browseFamily * 8 + (y - kListY) / kListH;
-    _synth.preview(_browseLayer, _browseBank, _browseProgram);
+    test(_browseLayer, _browseBank, _browseProgram, true);
     markDirty();
   }
 }
@@ -299,17 +316,20 @@ void SynthPage::drawMain()
     drawChip(i * 80, kGlobalY, 80, kGlobalH, globals[i], isSelected(6, i));
   }
 
-  drawChip(0, kWiringY, 120, kWiringH, c.bypass ? "Wiring:Bypass" : "Wiring:Separ.", true);
-  drawChip(120, kWiringY, 80, kWiringH, "Resend", true);
-  if (!c.bypass) {
+  drawChip(0, kWiringY, kWiringW, kWiringH, c.bypass ? "Bypass" : "Separate", true);
+  drawChip(kWiringW, kWiringY, kWiringW, kWiringH, c.speaker ? "Out:Speaker" : "Out:Chip", c.speaker);
+  drawChip(2 * kWiringW, kWiringY, kWiringW, kWiringH, "Resend", true);
+  M5.Display.setFont(&fonts::Font0);
+  if (c.speaker) {
+    M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
+    M5.Display.drawString("Built-in speaker plays the layers; chip silent", 2, kWarningY);
+  } else if (!c.bypass) {
     // Decided 2026-11-01: warn that synth settings reach DIN gear (Elektrons switch patterns on PC)
-    M5.Display.setFont(&fonts::Font0);
     M5.Display.setTextColor(TFT_ORANGE, TFT_BLACK);
-    snprintf(text, sizeof(text), "PC/CC on ch%u", c.configChannel);
-    M5.Display.drawString(text, 204, kWiringY + 2);
-    M5.Display.drawString("reach DIN gear!", 204, kWiringY + 12);
-    M5.Display.setFont(&fonts::AsciiFont8x16);
+    snprintf(text, sizeof(text), "Settings send PC/CC on ch%u to DIN gear too!", c.configChannel);
+    M5.Display.drawString(text, 2, kWarningY);
   }
+  M5.Display.setFont(&fonts::AsciiFont8x16);
 }
 
 void SynthPage::drawBrowser()

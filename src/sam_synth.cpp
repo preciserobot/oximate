@@ -53,7 +53,7 @@ void SamSynth::begin(MidiOutputs &outputs)
   // The chip forgets everything when powered off. In All mode with default effects there is
   // nothing to restore, and nothing is sent at boot (external gear stays untouched).
   SynthConfig defaults;
-  bool custom = _edit.listen != SynthListen::All || _edit.masterVolume != defaults.masterVolume ||
+  bool custom = _edit.listen != SynthListen::All || _edit.speaker || _edit.masterVolume != defaults.masterVolume ||
                 _edit.reverbType != defaults.reverbType || _edit.reverbLevel != defaults.reverbLevel ||
                 _edit.chorusLevel != defaults.chorusLevel || _edit.voices != defaults.voices;
   _restoreDue = custom;
@@ -186,7 +186,7 @@ uint8_t SamSynth::partChannel(int part) const
   for (int layer = 0; layer < kLayers; layer++) {
     if (partOf(layer) == part) return targetChannel(layer);
   }
-  return _active.listen == SynthListen::All ? defaultChannel(part) : 0;
+  return effectiveListen() == SynthListen::All ? defaultChannel(part) : 0;
 }
 
 /*! Mute other parts that listen on the config channel (in All mode: part 15 on channel 16),
@@ -212,7 +212,7 @@ void SamSynth::unmuteParts(uint16_t muted)
 
 uint8_t SamSynth::targetChannel(int layer) const
 {
-  switch (_active.listen) {
+  switch (effectiveListen()) {
     case SynthListen::All:    return defaultChannel(partOf(layer));
     case SynthListen::Layers: return _active.layers[layer].channel;
     default:                  return 0;
@@ -223,7 +223,7 @@ void SamSynth::applyLayer(int layer)
 {
   int part = partOf(layer);
   const SynthLayer &l = _active.layers[layer];
-  if (_active.listen == SynthListen::Layers && l.channel) {
+  if (effectiveListen() == SynthListen::Layers && l.channel) {
     uint16_t muted = muteConfigListeners(part);
     configureOnConfigChannel(part, l, layer == kDrumLayer);
     unmuteParts(muted);
@@ -246,9 +246,9 @@ void SamSynth::restore()
   for (int part = 0; part < kParts; part++) {
     bool layerPart = part >= 0 && part <= 4;
     if (layerPart) continue; // set by applyLayer below
-    assign(part, _active.listen == SynthListen::All ? defaultChannel(part) : 0);
+    assign(part, effectiveListen() == SynthListen::All ? defaultChannel(part) : 0);
   }
-  if (_active.listen == SynthListen::All) gs(0x40, 0x10, 0x15, 1); // part 0 plays drums again
+  if (effectiveListen() == SynthListen::All) gs(0x40, 0x10, 0x15, 1); // part 0 plays drums again
   for (int layer = 0; layer < kLayers; layer++) applyLayer(layer);
   applyGlobals();
 }
@@ -311,7 +311,8 @@ void SamSynth::run(uint32_t nowMillis)
   if (configChanged) {
     SynthConfig previous = _active;
     _active = next;
-    if (previous.listen != next.listen || previous.configChannel != next.configChannel) {
+    if (previous.listen != next.listen || previous.configChannel != next.configChannel ||
+        previous.speaker != next.speaker) {
       restore();
     } else {
       for (int layer = 0; layer < kLayers; layer++) {

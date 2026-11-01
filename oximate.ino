@@ -38,6 +38,7 @@
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
+#include "src/speaker_synth.h"
 #include "src/spi_bus.h"
 #include "src/synth_page.h"
 #include "src/ui.h"
@@ -59,7 +60,8 @@ Leds leds;
 Ui ui;
 Monitor monitor;
 RouterPage routerPage(router, leds, clockEngine);
-SynthPage synthPage(samSynth);
+SpeakerSynth speakerSynth;
+SynthPage synthPage(samSynth, speakerSynth);
 ClockPage clockPage(clockEngine, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
@@ -105,6 +107,7 @@ void setup()
 
   leds.begin();
   leds.setLevel(router.config().ledLevel);
+  speakerSynth.begin();
 
   Ui::splash("USB host");
   bool usbOk;
@@ -143,6 +146,41 @@ void logDinStatus()
   const DinMidi::Counters &c = dinMidi.counters();
   Serial.printf("DIN rx %lu bytes, tx %lu bytes, dropped %lu | USB %s\n", (unsigned long)c.rxBytes,
                 (unsigned long)c.txBytes, (unsigned long)c.txDropped, usbMidi.connected() ? "connected" : "--");
+}
+
+/*! Built-in speaker output (stage 6): plays what the synth chip would play, from the routed
+ *  input events. Layers mode: the layer channels (drum layer as drums); All mode: every channel
+ *  (channel 10 as drums). */
+void feedSpeaker(const MidiMessage &msg, bool forwarded)
+{
+  const SynthConfig &c = samSynth.config();
+  static uint8_t volume = 0;
+  if (volume != c.masterVolume) {
+    volume = c.masterVolume;
+    speakerSynth.setVolume(volume);
+  }
+  if (!c.speaker || !forwarded || !msg.isChannel()) return;
+  uint8_t type = msg.status() & 0xF0;
+  if (type != 0x90 && type != 0x80) return;
+  uint8_t channel = msg.channel();
+  bool play = false, drums = false;
+  if (c.listen == SynthListen::All) {
+    play = true;
+    drums = channel == 10;
+  } else if (c.listen == SynthListen::Layers) {
+    for (int layer = 0; layer < SamSynth::kLayers; layer++) {
+      if (c.layers[layer].channel == channel) {
+        play = true;
+        drums = drums || layer == SamSynth::kDrumLayer;
+      }
+    }
+  }
+  if (!play) return;
+  if (type == 0x90 && msg.bytes[2] > 0) {
+    speakerSynth.noteOn(msg.bytes[1], msg.bytes[2], drums);
+  } else if (!drums) {
+    speakerSynth.noteOff(msg.bytes[1]);
+  }
 }
 
 /*! Power button: short press = panic levels 1+2, ~1.5 s hold = level 3 (any page).
@@ -185,6 +223,7 @@ void loop()
   while (MidiTask::events().pop(event)) {
     MidiMessage msg = event.message();
     leds.activity(msg);
+    feedSpeaker(msg, event.forwarded);
     monitor.log(msg, event.forwarded, event.length);
   }
 
@@ -197,6 +236,7 @@ void loop()
   router.poll();
   clockEngine.poll();
   samSynth.poll();
+  speakerSynth.update();
   diagPage.eventsDropped(MidiTask::events().dropped());
   diagPage.loopTime(micros() - loopStart);
   logDinStatus();

@@ -31,10 +31,11 @@ struct SynthLayer
 /*! Synth settings, persisted in NVS (key "synth"). Bump kVersion when the layout changes. */
 struct SynthConfig
 {
-  static constexpr uint8_t kVersion = 1;
+  static constexpr uint8_t kVersion = 2;
 
   uint8_t version = kVersion;
   SynthListen listen = SynthListen::All;
+  bool speaker = false;       ///< play on the Core2's built-in speaker instead (the chip is silenced)
   uint8_t configChannel = 16; ///< settings are sent here; no external gear should use it
   bool bypass = false;        ///< the Unit MIDI switch is on Bypass (only affects warnings)
   /// Layers 0-3 are melodic (SAM parts 1-4), layer 4 is the drum layer (part 0)
@@ -109,6 +110,7 @@ private:
   void gs(uint8_t address1, uint8_t address2, uint8_t address3, uint8_t value);
   void assign(int part, uint8_t channel); ///< 0 = OFF
   void configureOnConfigChannel(int part, const SynthLayer &layer, bool drums);
+  SynthListen effectiveListen() const { return _active.speaker ? SynthListen::Off : _active.listen; }
   uint8_t targetChannel(int layer) const;
   uint8_t partChannel(int part) const;
   uint16_t muteConfigListeners(int exceptPart);

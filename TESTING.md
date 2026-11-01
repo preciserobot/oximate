@@ -88,6 +88,7 @@ Separate, settings go out on channel 16 to DIN gear too.
 - [ ] Mode Off: the synth is silent; DIN OUT still works
 - [ ] Settings survive a power cycle (the layers come back after power-on)
 - [ ] Panic or a System Reset from your gear: the synth comes back with your layers within a moment
+- [ ] Out:Speaker: the Core2's speaker plays the layer channels and the test chord; the chip is silent; switching back to Out:Chip restores the chip
   > Did any setting change reach the Elektron/Oxi on channel 16?
 
 ## Other notes
