@@ -176,8 +176,8 @@ void DiagPage::drawSystem()
   snprintf(text, sizeof(text), " Battery   %ld%%  %.2f V  %s", (long)M5.Power.getBatteryLevel(),
            M5.Power.getBatteryVoltage() / 1000.0f, kCharging[M5.Power.isCharging()]);
   line(3, text);
-  snprintf(text, sizeof(text), " DIN TX    free %u  dropped %lu", (unsigned)_din.txSpace(),
-           (unsigned long)_din.counters().txDropped);
+  snprintf(text, sizeof(text), " DIN       rx %lu  tx %lu  drop %lu", (unsigned long)_din.counters().rxBytes,
+           (unsigned long)_din.counters().txBytes, (unsigned long)_din.counters().txDropped);
   line(4, text);
   snprintf(text, sizeof(text), " USB       dropped %lu  bus busy %lu", (unsigned long)_usb.counters().txDropped,
            (unsigned long)_usb.counters().busBusy);

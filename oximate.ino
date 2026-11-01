@@ -84,8 +84,11 @@ void setup()
   uint32_t splashStart = millis();
   Ui::splash("starting");
 
-  // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2)
-  dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
+  // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2). The Unit MIDI's output line
+  // ends up on the pin M5Unified calls port_c_txd (GPIO 14) and its input on port_c_rxd
+  // (GPIO 13), so the names are crossed here. Verified on hardware 2026-11-01: the other
+  // way round, receive sees only noise and nothing reaches DIN OUT.
+  dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_txd), M5.getPin(m5::pin_name_t::port_c_rxd), onMidi);
   outputs.begin(dinMidi, usbMidi, noteTracker);
   clockEngine.begin(outputs);
   router.begin(outputs, clockEngine);
@@ -123,7 +126,18 @@ void setup()
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
   MidiTask::start(usbMidi, dinMidi, clockEngine);
-  Serial.println("OxiMate running");
+  Serial.printf("OxiMate running (DIN on GPIO RX %d / TX %d)\n", dinMidi.rxPin(), dinMidi.txPin());
+}
+
+/*! Serial status line every 2 s while DIN is being brought up */
+void logDinStatus()
+{
+  static uint32_t last = 0;
+  if (millis() - last < 2000) return;
+  last = millis();
+  const DinMidi::Counters &c = dinMidi.counters();
+  Serial.printf("DIN rx %lu bytes, tx %lu bytes, dropped %lu | USB %s\n", (unsigned long)c.rxBytes,
+                (unsigned long)c.txBytes, (unsigned long)c.txDropped, usbMidi.connected() ? "connected" : "--");
 }
 
 /*! Power button: short press = panic levels 1+2, ~1.5 s hold = level 3 (any page).
@@ -179,5 +193,6 @@ void loop()
   clockEngine.poll();
   diagPage.eventsDropped(MidiTask::events().dropped());
   diagPage.loopTime(micros() - loopStart);
+  logDinStatus();
   delay(1); // let the idle task run; the UI doesn't need more than ~1 kHz
 }

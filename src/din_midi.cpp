@@ -6,6 +6,8 @@ void DinMidi::begin(HardwareSerial &serial, int8_t rxPin, int8_t txPin, MidiHand
 {
   _serial = &serial;
   _handler = handler;
+  _rxPin = rxPin;
+  _txPin = txPin;
   // Must be set before begin(). No TX ring buffer: writes go straight to the FIFO, so
   // availableForWrite() reports FIFO space and pumpTx() controls what goes out when.
   _serial->setRxBufferSize(1024);
@@ -16,6 +18,7 @@ void DinMidi::begin(HardwareSerial &serial, int8_t rxPin, int8_t txPin, MidiHand
 void DinMidi::poll()
 {
   while (_serial->available()) {
+    _counters.rxBytes++;
     parse(_serial->read(), micros());
   }
 }
@@ -46,6 +49,7 @@ void DinMidi::pumpTx()
   // Realtime bytes may legally interrupt any message, including SysEx
   while (inFifo < kFifoTarget && (!_realtime.empty() || !_queue.empty())) {
     _serial->write(_realtime.empty() ? _queue.pop() : _realtime.pop());
+    _counters.txBytes++;
     inFifo++;
   }
 }

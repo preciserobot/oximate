@@ -73,8 +73,10 @@ INT  | 35   | Set this on the USB board.
 The following comes from the Unit MIDI schematic. M5Stack's prose
 documentation is ambiguous on this point.
 
-* Grove → Core2 Port C: the Core2 receives on **G13** and transmits on **G14**,
-  at 31250 baud.
+* Grove → Core2 Port C: the Core2 receives on **G14** and transmits on **G13**,
+  at 31250 baud. This is the reverse of M5Unified's `port_c_rxd`/`port_c_txd`
+  names, and was confirmed on the hardware: with the pins the other way round,
+  the receive pin only picks up noise and nothing reaches DIN OUT.
 * **DIN IN always reaches the Core2**, in both switch positions.
 * **The Core2's output always drives the SAM2695 synth.**
 * The front switch only selects the source for **DIN OUT**:
@@ -91,8 +93,8 @@ the USB Host Module.
 
 ## Controls
 
-* **Switch page:** **swipe left or right** anywhere on the screen (left =
-  next page, right = previous), or tap the header bar at the top. The page
+* **Switch page:** **swipe left or right** across the screen, at least half
+  its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
   Router → Clock → Diag → Monitor.
 * **Touch buttons A/B/C** (the three circles below the screen) belong to the

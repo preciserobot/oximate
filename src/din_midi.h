@@ -15,9 +15,13 @@ public:
   struct Counters
   {
     uint32_t txDropped = 0; ///< messages that did not fit the output queue
+    uint32_t rxBytes = 0;   ///< bytes received from DIN IN
+    uint32_t txBytes = 0;   ///< bytes written to DIN OUT
   };
 
   void begin(HardwareSerial &serial, int8_t rxPin, int8_t txPin, MidiHandler handler);
+  int8_t rxPin() const { return _rxPin; }
+  int8_t txPin() const { return _txPin; }
   void poll();   ///< read and parse received bytes
   void pumpTx(); ///< top up the UART FIFO from the queues; call at least every millisecond
   void send(const MidiMessage &msg);
@@ -47,6 +51,7 @@ private:
   void emit(const uint8_t *bytes, uint16_t length, uint32_t timeMicros);
 
   HardwareSerial *_serial = nullptr;
+  int8_t _rxPin = -1, _txPin = -1;
   MidiHandler _handler = nullptr;
   Counters _counters;
 
