@@ -27,10 +27,10 @@ synth.
 | 7 | [Ear trainer](#stage-7-ear-trainer) | ✅ | needs hardware test |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | ✅ | needs hardware test |
-| 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | idea |
+| 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | planned (full plan) |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | idea |
-| 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | idea |
-| 13 | [Recorder / looper](#stage-13-recorder--looper) | — | idea |
+| 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | planned (full plan) |
+| 13 | [Recorder / looper](#stage-13-recorder--looper) | — | planned (full plan) |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | idea |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | idea |
 | 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
@@ -646,6 +646,14 @@ The motor is switched through the power chip over I2C, so it's driven from
 the UI thread with a few milliseconds of latency. That's fine for cues, but
 not sample-accurate. It also buzzes audibly, which may matter near a mic.
 
+**Plan (2026-11-01):** cues are produced in the MIDI task (beats scheduled one
+period ahead, minus the motor's spin-up time) and played on the UI thread,
+because the motor sits on the internal I2C bus. Cues differ by length and
+rhythm: beat 70 ms, downbeat 140 ms, double and triple pulses for warnings.
+There's also an optional speaker click per cue group, settings in a "Cues"
+view on the Clock page, and expected accuracy of about ±5 ms.
+**Full plan:** [docs/stages/stage-10.md](docs/stages/stage-10.md)
+
 ### Stage 11: MIDI effects
 
 Arpeggiator, chord generator, scale quantiser, transpose, velocity curves and
@@ -657,10 +665,30 @@ they combine with the router's settings.
 Euclidean rhythms, with the hits shown around the "ring" of 10 LEDs. A
 looping random sequence that slowly mutates.
 
+**Plan (2026-11-01):** a Gen page with 8 slots running alongside the drum
+machine:
+* **Euclid:** steps, hits, rotation, accents, probability; each slot has its
+  own length (polymeter).
+* **Turing:** a mutating register, quantised to a scale from
+  `music_theory`, with lock and reseed.
+* **Mod lanes:** CC with S&H, smooth random or LFO shapes.
+
+Euclid can also fill a drum lane. Shared note handling moves to
+`src/step_voice.*`.
+**Full plan:** [docs/stages/stage-12.md](docs/stages/stage-12.md)
+
 ### Stage 13: Recorder / looper
 
 Record the merged stream into PSRAM, then save it to the SD card as `.mid`
 files and play it back. The LEDs pulse red while recording.
+
+**Plan (2026-11-01):** a clock-synced looper first (1–16 bars from the next
+bar line, overdub with undo, optional quantise), a free recorder second. It
+captures routed input from a MIDI-task observer into PSRAM at 96 PPQN.
+Standard MIDI Files go to the SD card from a low-priority task, at most 4 KB
+per hold of the shared SPI bus. Without a card everything except save and load
+works. Needs a microSD card in the Core2.
+**Full plan:** [docs/stages/stage-13.md](docs/stages/stage-13.md)
 
 ### Stage 14: SysEx librarian
 
