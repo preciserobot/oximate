@@ -105,6 +105,25 @@ Separate, settings go out on channel 16 to DIN gear too.
 * [ ] Out:Speaker: the Core2's speaker plays the layer channels and the test chord; the chip is silent; switching back to Out:Chip restores the chip
   > Did any setting change reach the Elektron/Oxi on channel 16?
 
+## 8. Ear trainer (stage 7)
+
+Synth output on "Chip" (questions on the SAM2695, channel 15) unless noted.
+
+- [ ] The Ear page appears after Clock
+- [ ] Intervals: B plays a question; tapping the right answer turns it green, a wrong one red; the result line names the notes
+- [ ] Answering on a keyboard works in any octave (play the two notes of the interval)
+- [ ] Chords: playing the chord on a keyboard in any inversion counts as correct
+- [ ] Degrees: the I–IV–V–I cadence plays, then the note; playing the note answers
+- [ ] Melody: play the melody back; the prompt counts up (1/3, 2/3 ...)
+- [ ] A replays, B skips (counts as wrong, shows the answer), C cycles the level (1–4, Auto)
+- [ ] LEDs flash green/red and show the streak; the vibration motor pulses (switchable)
+- [ ] Statistics and levels survive a power cycle
+- [ ] Explorer: tapping a root or quality plays the chord; B steps through inversions; C switches block/arpeggio
+- [ ] Explorer: a chord played on a keyboard is named ("You played: ...")
+- [ ] Leaving the page mid-question leaves no hanging notes
+- [ ] Synth output on "Speaker": questions play on the built-in speaker, nothing on DIN OUT
+  > Did channel 15 notes reach any of your DIN gear?
+
 ## Other notes
 
 >

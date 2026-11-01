@@ -24,7 +24,7 @@ synth.
 | 4 | [Push 2 host](#stage-4-push-2-host) | — | planned (full plan) |
 | 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
 | 6 | [Preview synth](#stage-6-preview-synth) | ✅ | needs hardware test |
-| 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
+| 7 | [Ear trainer](#stage-7-ear-trainer) | ✅ | needs hardware test |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | idea |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Clock → Diag → Monitor.
+  Router → Synth → Clock → Ear → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -123,6 +123,8 @@ the USB Host Module.
 | Router | All channels on | LED brightness | Default settings |
 | Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
+| Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
+| Ear (explorer) | Play | Next inversion | Block / Arpeggio |
 | Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
 
 ## Architecture
@@ -202,7 +204,8 @@ piece is built by the first stage that needs it.
 | `ClockEngine` | 8 | the only source of outgoing clock and transport |
 | `SamSynth` | 6 | the only code that talks to the SAM2695; stages claim parts |
 | `StepSequencer` | 4 | pattern/step core shared by the Push 2 sequencer and the drum machine |
-| `music_theory` | 7 / 21 | note names, chord tables and chord naming; created by whichever of stage 7 or 21 is built first; stage 21 adds the extended-chord matcher both use |
+| `music_theory` | 7 / 21 | note names, interval/chord/scale tables, pitch-class sets, exact chord matching with inversions. **Created by stage 7**; stage 21 extends the chord table (appending after `Add9`) and adds the scoring matcher both use |
+| `SamSynth::claimPart()` | 6 / 7 | parts 5–14 for other stages: `claimPart(channel)`, `setPart()`, `releasePart()`; set up via the config channel, re-applied after resets (added by stage 7) |
 | `ChordInput` | 21 | input observer in the MIDI task: the exact set of notes held at the inputs, published as a snapshot |
 
 ### Decisions (2026-11-01)
@@ -472,6 +475,33 @@ Two pages for ear training on the SAM2695.
 * A small local note scheduler handles playback (questions don't follow
   transport or swing). LEDs flash green/red and show the streak.
 * Theory and trainer logic are plain C++ and unit-tested on the Mac.
+
+**Implemented (2026-11-01)**, with these differences from the plan:
+
+* **One page, two modes** ("Ear"): the trainer and the chord explorer
+  switch with a chip (`Explorer>` / `<Trainer`) instead of being two pages,
+  so there is one page less to swipe through.
+* Questions play on SAM2695 part 14 (it already defaults to channel 15),
+  claimed with the new `SamSynth::claimPart()` and set to acoustic grand
+  piano through the config channel while the page is open. With the Synth
+  page's output on "Speaker" they play on the built-in speaker and nothing
+  goes to DIN.
+* Keyboard answers come from any input and channel **except 10** (drums)
+  and **15** (the trainer's own notes, which a device with MIDI thru would
+  echo back).
+* Notes are sent with `MidiTask::send()` from a small scheduler on the UI
+  side; leaving the page sends note-offs for every note still sounding.
+* Levels: C cycles 1 → 2 → 3 → 4 → Auto. Auto moves up after 10 answers at
+  90% or better and down below 50%, without asking.
+* Statistics (per exercise, streak, best streak, weak-spot weights, levels,
+  vibration on/off) are saved in NVS under `trainer`.
+* LEDs: green or red flash on an answer, then the streak in blue; in the
+  explorer, the chord tones in their pitch-class colours. A short vibration
+  on each answer (switchable).
+* Not built: answer input restricted to one device or channel, solfège,
+  absolute-pitch exercises. The Monitor still has its own note-name
+  function (moving it to `music_theory` was left out to keep the merge
+  small).
 
 **Full plan:** [docs/stages/stage-7.md](docs/stages/stage-7.md)
 
@@ -783,6 +813,9 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/sam_synth.*`  | SAM2695 control: part map, layers, effects, auditions, restore after resets |
 | `src/synth_page.*`  | the Synth page and instrument browser |
 | `src/gm_names.h`    | GM instrument names, families, drum kits |
+| `src/music_theory.*` | note names, intervals, chords, scales, chord matching (stages 7 and 21) |
+| `src/ear_trainer.*` | ear-trainer logic: questions, answers, levels, statistics |
+| `src/ear_page.*`    | the Ear page (trainer and chord explorer) |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |

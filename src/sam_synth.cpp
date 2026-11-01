@@ -98,6 +98,46 @@ void SamSynth::preview(int layer, uint8_t bank, uint8_t program)
   _previewProgram = program;
 }
 
+int8_t SamSynth::claimPart(uint8_t channel)
+{
+  int8_t free = -1;
+  for (int part = kFirstClaimPart; part <= kLastClaimPart; part++) {
+    if (_claimEdit[part].claimed) continue;
+    // In All mode the part that already listens on this channel avoids a doubled sound
+    if (defaultChannel(part) == channel) {
+      free = part;
+      break;
+    }
+    if (free < 0) free = part;
+  }
+  if (free >= 0) {
+    _claimEdit[free] = {true, channel, 0, 100};
+    publishClaims();
+  }
+  return free;
+}
+
+void SamSynth::setPart(int8_t part, uint8_t channel, uint8_t program, uint8_t volume)
+{
+  if (part < kFirstClaimPart || part > kLastClaimPart || !_claimEdit[part].claimed) return;
+  _claimEdit[part] = {true, channel, program, volume};
+  publishClaims();
+}
+
+void SamSynth::releasePart(int8_t part)
+{
+  if (part < kFirstClaimPart || part > kLastClaimPart) return;
+  _claimEdit[part].claimed = false;
+  publishClaims();
+}
+
+void SamSynth::publishClaims()
+{
+  CriticalGuard guard(_lock);
+  memcpy(_claimPending, _claimEdit, sizeof(_claimEdit));
+  _claimsChanged = true;
+}
+
 void SamSynth::load()
 {
   Preferences prefs;
@@ -183,6 +223,7 @@ void SamSynth::configureOnConfigChannel(int part, const SynthLayer &layer, bool 
 /*! The channel a part currently listens on */
 uint8_t SamSynth::partChannel(int part) const
 {
+  if (_claimActive[part].claimed) return _active.speaker ? 0 : _claimActive[part].channel;
   for (int layer = 0; layer < kLayers; layer++) {
     if (partOf(layer) == part) return targetChannel(layer);
   }
@@ -240,13 +281,31 @@ void SamSynth::applyGlobals()
   gs(0x40, 0x01, 0x3A, _active.chorusLevel);
 }
 
+/*! A claimed part gets its sound through the config channel, then its channel; a released one
+ *  goes back to its default channel (All mode) or is muted */
+void SamSynth::applyClaim(int part)
+{
+  const PartClaim &claim = _claimActive[part];
+  if (claim.claimed && !_active.speaker) {
+    SynthLayer sound = {claim.channel, 0, claim.program, claim.volume, 40};
+    uint16_t muted = muteConfigListeners(part);
+    configureOnConfigChannel(part, sound, false);
+    unmuteParts(muted);
+  }
+  assign(part, partChannel(part));
+}
+
 void SamSynth::restore()
 {
   if (_audition.active) endAudition();
   for (int part = 0; part < kParts; part++) {
     bool layerPart = part >= 0 && part <= 4;
     if (layerPart) continue; // set by applyLayer below
-    assign(part, effectiveListen() == SynthListen::All ? defaultChannel(part) : 0);
+    if (_claimActive[part].claimed) {
+      applyClaim(part);
+    } else {
+      assign(part, effectiveListen() == SynthListen::All ? defaultChannel(part) : 0);
+    }
   }
   if (effectiveListen() == SynthListen::All) gs(0x40, 0x10, 0x15, 1); // part 0 plays drums again
   for (int layer = 0; layer < kLayers; layer++) applyLayer(layer);
@@ -290,6 +349,8 @@ void SamSynth::endAudition()
 void SamSynth::run(uint32_t nowMillis)
 {
   SynthConfig next;
+  PartClaim claims[kParts];
+  bool claimsChanged;
   bool configChanged, restoreRequested;
   int8_t test, previewLayer;
   uint8_t previewBank, previewProgram;
@@ -306,6 +367,17 @@ void SamSynth::run(uint32_t nowMillis)
     _previewLayer = -1;
     previewBank = _previewBank;
     previewProgram = _previewProgram;
+    claimsChanged = _claimsChanged;
+    _claimsChanged = false;
+    memcpy(claims, _claimPending, sizeof(claims));
+  }
+
+  if (claimsChanged) {
+    for (int part = kFirstClaimPart; part <= kLastClaimPart; part++) {
+      if (memcmp(&claims[part], &_claimActive[part], sizeof(PartClaim)) == 0) continue;
+      _claimActive[part] = claims[part];
+      applyClaim(part);
+    }
   }
 
   if (configChanged) {

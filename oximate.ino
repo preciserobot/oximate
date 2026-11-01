@@ -29,6 +29,7 @@
 #include "src/diag_page.h"
 #include "src/diagnostics.h"
 #include "src/din_midi.h"
+#include "src/ear_page.h"
 #include "src/input_observers.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
@@ -64,6 +65,7 @@ RouterPage routerPage(router, leds, clockEngine);
 SpeakerSynth speakerSynth;
 SynthPage synthPage(samSynth, speakerSynth);
 ClockPage clockPage(clockEngine, leds);
+EarPage earPage(samSynth, speakerSynth, leds); // stage 7: ear trainer + chord explorer
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
@@ -133,6 +135,8 @@ void setup()
   ui.addPage(routerPage);
   ui.addPage(synthPage);
   ui.addPage(clockPage);
+  earPage.begin();
+  ui.addPage(earPage);
   ui.addPage(diagPage);
 
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
@@ -261,6 +265,7 @@ void loop()
   router.poll();
   clockEngine.poll();
   samSynth.poll();
+  earPage.poll();
   speakerSynth.update();
   diagPage.eventsDropped(MidiTask::events().dropped());
   uint32_t loopEnd = micros();

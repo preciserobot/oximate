@@ -88,6 +88,13 @@ public:
   void testLayer(int layer);
   void preview(int layer, uint8_t bank, uint8_t program); ///< audition a sound on a layer's part
 
+  /*! Parts for other stages (e.g. the ear trainer): claim one, give it a channel and a sound
+   *  (set up through the config channel, like the layers), release it when done. UI side. */
+  static constexpr int kFirstClaimPart = 5, kLastClaimPart = 14;
+  int8_t claimPart(uint8_t channel); ///< prefers the part that defaults to `channel`; -1 if none free
+  void setPart(int8_t part, uint8_t channel, uint8_t program, uint8_t volume);
+  void releasePart(int8_t part); ///< back to its default (All mode) or muted
+
   // MIDI task side
   void run(uint32_t nowMillis);
 
@@ -102,7 +109,17 @@ private:
     uint16_t muted; // parts muted while the audition plays on the config channel
   };
 
+  struct PartClaim
+  {
+    bool claimed;
+    uint8_t channel; // 1-16
+    uint8_t program;
+    uint8_t volume;
+  };
+
   static void onSent(MidiOutput out, const MidiMessage &msg, Origin origin, void *ctx);
+  void publishClaims();
+  void applyClaim(int part);
 
   void send(const uint8_t *bytes, uint16_t length);
   void controlChange(uint8_t channel, uint8_t controller, uint8_t value);
@@ -137,6 +154,9 @@ private:
   bool _restoreRequested = false;
   int8_t _testRequested = -1;
   int8_t _previewLayer = -1;
+  PartClaim _claimEdit[kParts] = {};    // UI side
+  PartClaim _claimPending[kParts] = {}; // handed over under _lock
+  bool _claimsChanged = false;
   uint8_t _previewBank = 0, _previewProgram = 0;
 
   // MIDI task side
@@ -144,4 +164,5 @@ private:
   uint32_t _restoreAt = 0; ///< millis, 0 = none scheduled
   bool _restoreDue = false;
   Audition _audition = {};
+  PartClaim _claimActive[kParts] = {};
 };
