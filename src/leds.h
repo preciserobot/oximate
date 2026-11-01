@@ -4,7 +4,8 @@
 #include "midi_message.h"
 
 /*! The 10 RGB LEDs (SK6812, GPIO25) of the M5GO Bottom2, as two strips of 5.
- *  Unclaimed LEDs show input activity: LEDs 0-4 flash for USB, 5-9 for DIN.
+ *  Unclaimed LEDs show input activity: LEDs 0-4 (right side of the base) flash for USB,
+ *  5-9 (left side) for DIN.
  *  A mode claims a range of LEDs and sets them with setPixel() until it releases them
  *  (README "Shared infrastructure": LED claims). UI thread only. */
 class Leds

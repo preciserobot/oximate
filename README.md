@@ -153,8 +153,9 @@ side of the base. M5Unified drives them through the ESP32's RMT peripheral
 10; M5Unified only sets up 1 on the Core2. Updates run at about 60 fps or
 less.
 
-* **Default (input activity).** LEDs 0–4 flash for USB input, LEDs 5–9 for
-  DIN input. Verify which physical side is which.
+* **Default (input activity).** LEDs 0–4 (the **right** side of the base,
+  seen from the front) flash for USB input, LEDs 5–9 (the **left** side) for
+  DIN input. Checked on the hardware.
   * Note-on: colour by pitch class (C = red, around the colour wheel to B),
     brightness by velocity.
   * Other channel messages: dim white. SysEx: magenta.

@@ -24,12 +24,12 @@ Before starting: set the Unit MIDI's front switch to **Separate**.
 * [x] Notes from a USB keyboard show on the Monitor in cyan
 * [x] Notes from DIN IN show on the Monitor in orange
 * [x] Both inputs come out of DIN OUT
-* [ ] Both inputs are audible on the SAM2695 (headphones on the Unit MIDI)
+* [x] Both inputs are audible on the SAM2695 (headphones on the Unit MIDI)
 * [x] DIN IN notes reach the USB device
 * [x] Monitor buttons: A clears, B pauses/resumes, C shows/hides clock messages
 * [x] LEDs flash on incoming notes
-  > Which side lights up for USB, and which for DIN:
-* [ ] Playing fast on both inputs while switching pages: no missing notes, no stuck notes, no freezes
+  > Which side lights up for USB, and which for DIN: right side = USB, left side = DIN
+* [x] Playing fast on both inputs while switching pages: no missing notes, no stuck notes, no freezes
 
 ## 2. Router page
 
