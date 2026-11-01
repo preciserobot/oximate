@@ -5,7 +5,6 @@
 #include "clock_engine.h"
 #include "usb_midi.h"
 
-static constexpr uint32_t kStuckCheckMillis = 1000;
 static constexpr uint32_t kSummaryMillis = 100;
 
 void Panic::begin(MidiOutputs &outputs, NoteTracker &tracker, UsbMidi &usb, ClockEngine &clock)
@@ -138,19 +137,6 @@ void Panic::run(uint32_t nowMillis)
   if (_dinSensing && nowMillis - _lastSensingMillis > kActiveSensingMillis) {
     _dinSensing = false;
     releaseFrom(Origin::fromInput(MidiSource::Din));
-  }
-
-  // Notes held longer than kStuckMillis are released
-  if (nowMillis - _lastStuckCheck >= kStuckCheckMillis) {
-    _lastStuckCheck = nowMillis;
-    MidiOutput out;
-    NoteTracker::HeldNote stuck;
-    for (int i = 0; i < 16 && _tracker->findStuck(nowMillis, kStuckMillis, out, stuck); i++) {
-      uint8_t off[3] = {(uint8_t)(0x80 | stuck.channel), stuck.note, 0};
-      _outputs->send(out, {MidiSource::Din, 0, off, 3}, stuck.origin);
-      _tracker->forget(out, stuck.channel, stuck.note); // also when a pedal still sustains it
-      _autoReleased++;
-    }
   }
 
   if (nowMillis - _lastSummary >= kSummaryMillis || _level || wasRunning) {

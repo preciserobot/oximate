@@ -219,7 +219,7 @@ piece is built by the first stage that needs it.
 | External clock lost | OxiMate **stops** |
 | Panic trigger | **power button** (short press = levels 1+2, ~1.5 s hold = level 3) |
 | Panic and transport | panic also sends **Stop** (`FC`) |
-| Stuck notes | **released automatically** after the threshold (default 30 s) |
+| Stuck notes | **not** released on a timer: long pads are held on purpose. Automatic release only on USB unplug, Active Sensing loss and routing changes |
 | Drum machine | **32 steps** (two pages of 16 pads). A USB pad controller can **play lanes live and record** into steps |
 
 **Channel 16 is reserved** for SAM2695 settings (stage 6). The ear trainer
@@ -543,7 +543,7 @@ screen. Each is opt-in:
   external clock
 * a short tick when a touch button or chip is pressed (the touch buttons
   are flat, so you can't feel them)
-* confirmation of a panic, and a warning before a stuck note is released
+* confirmation of a panic
 * "feel the kick": a pulse on chosen notes, e.g. the kick drum on channel 10
 * right or wrong answer in the ear trainer (stage 7)
 * low battery
@@ -591,7 +591,7 @@ Get out of stuck-note situations quickly, and see what's going on.
   level 3 (a 6 s hold still powers off). Fallbacks: header hold, button C on
   the Diagnostics page.
 * **Automatic release:** on USB disconnect, Active Sensing timeout, and
-  before a router change takes effect. Stuck notes are released automatically after 30 s.
+  before a router change takes effect. Long notes are never cut on a timer.
 * **Diagnostics page:** channel activity, message counters and rates, DIN
   TX buffer, dropped SysEx, USB errors, heap/PSRAM, battery.
 
@@ -599,8 +599,8 @@ Get out of stuck-note situations quickly, and see what's going on.
 
 * Level 3 sends ordinary 3-byte note-offs (about 2 s on DIN) instead of a
   running-status stream (1.3 s), so other output never has to pause.
-* Stuck notes are released after 30 s, as decided; there is no setting for
-  the threshold yet.
+* Notes are not released on a timer: the 30 s release was removed after
+  hardware testing, because long pads are held on purpose.
 * The header-hold fallback isn't built; C on the Diag page does the same.
 * Counters: per input and message type, filtered, output totals, DIN and USB
   queue drops, SPI-bus-busy skips, UI events dropped, UI loop time. Not yet:

@@ -44,21 +44,23 @@ are built on top; the rest can be checked along the way.
 
 ## 3. Clock page
 
-* [ ] **MUST** Start/Stop sends clock to the M8 over USB (the M8 follows the tempo and starts/stops)
-* [ ] **MUST** Outputs view: switching DIN clock on makes the Elektron follow over DIN
-* [ ] The tempo chips (±1, ±0.1) and tap tempo (B) change the tempo
-* [ ] The LEDs show beat and bar while the Clock page is open
-* [ ] **MUST** Source DIN with the Elektron sending clock: tempo shown, rightmost LED turns blue (locked)
-* [ ] **MUST** Stopping or unplugging the Elektron's clock: the display shows LOST and OxiMate stops
-* [ ] Clock settings are still there after a power cycle
+* [x] **MUST** Start/Stop sends clock to the M8 over USB (the M8 follows the tempo and starts/stops)
+* [x] **MUST** Outputs view: switching DIN clock on makes the Elektron follow over DIN
+* [x] The tempo chips (±1, ±0.1) and tap tempo (B) change the tempo
+* [x] The LEDs show beat and bar while the Clock page is open
+* [x] **MUST** Source DIN with the Elektron sending clock: tempo shown, rightmost LED turns blue (locked)
+* [x] **MUST** Stopping or unplugging the Elektron's clock: the display shows LOST and OxiMate stops
+* [x] Clock settings are still there after a power cycle
+* On the clock page the start/stop label does get out of sync with the clock status (does not always update on stopping or starting)
 
 ## 4. Panic and stuck notes
 
-* [ ] **MUST** Short power-button press: PANIC in the header, LEDs flash red, held notes stop
-* [ ] Holding the power button ~1.5 s: PANIC ALL, the red LED bar fills over about 2 s
-* [ ] **MUST** Holding a note on a USB keyboard and unplugging it: the note stops on DIN
-* [ ] A note held for more than 30 s is released automatically
+* [x] **MUST** Short power-button press: PANIC in the header, LEDs flash red, held notes stop
+* [x] Holding the power button ~1.5 s: PANIC ALL, the red LED bar fills over about 2 s
+* [x] **MUST** Holding a note on a USB keyboard and unplugging it: the note stops on DIN
+* [x] ~~A note held for more than 30 s is released automatically~~ removed (2026-11-01)
   > Is the 30 s auto-release OK for drones/pads you hold on purpose?
+  No i think this can be removed as we'll likely use very long pads (notes longer than 30s, using pitchbend modulation for example)
 
 ## 5. Diag page
 
@@ -74,21 +76,21 @@ are built on top; the rest can be checked along the way.
 Headphones on the Unit MIDI. Note the PC/CC warning: with the switch on
 Separate, settings go out on channel 16 to DIN gear too.
 
-- [ ] Synth page appears between Router and Clock
-- [ ] Mode All: the synth plays every channel as before
-- [ ] Mode Layers: layer 1 (ch1, piano) plays from a keyboard on channel 1; a keyboard on channel 2 is silent on the synth
-- [ ] Layer 2 also on ch1 with strings: piano and strings stack
-- [ ] B on a layer row plays a test chord with that layer's sound
-- [ ] Browser (B on an instrument cell): tapping a sound previews it; C selects it; A goes back unchanged
-- [ ] MT-32 bank (B in the browser) sounds different from GM
-- [ ] Drum layer: each of the 5 kits plays (B on the drum row)
+* [ ] Synth page appears between Router and Clock
+* [ ] Mode All: the synth plays every channel as before
+* [ ] Mode Layers: layer 1 (ch1, piano) plays from a keyboard on channel 1; a keyboard on channel 2 is silent on the synth
+* [ ] Layer 2 also on ch1 with strings: piano and strings stack
+* [ ] B on a layer row plays a test chord with that layer's sound
+* [ ] Browser (B on an instrument cell): tapping a sound previews it; C selects it; A goes back unchanged
+* [ ] MT-32 bank (B in the browser) sounds different from GM
+* [ ] Drum layer: each of the 5 kits plays (B on the drum row)
   > Does the CM-64/32 kit sound?
-- [ ] Volume, reverb send, master volume, reverb type/level and chorus change the sound
-- [ ] Voices Full / Lite / Dry: reverb and chorus switch off in Lite / Dry
-- [ ] Mode Off: the synth is silent; DIN OUT still works
-- [ ] Settings survive a power cycle (the layers come back after power-on)
-- [ ] Panic or a System Reset from your gear: the synth comes back with your layers within a moment
-- [ ] Out:Speaker: the Core2's speaker plays the layer channels and the test chord; the chip is silent; switching back to Out:Chip restores the chip
+* [ ] Volume, reverb send, master volume, reverb type/level and chorus change the sound
+* [ ] Voices Full / Lite / Dry: reverb and chorus switch off in Lite / Dry
+* [ ] Mode Off: the synth is silent; DIN OUT still works
+* [ ] Settings survive a power cycle (the layers come back after power-on)
+* [ ] Panic or a System Reset from your gear: the synth comes back with your layers within a moment
+* [ ] Out:Speaker: the Core2's speaker plays the layer channels and the test chord; the chip is silent; switching back to Out:Chip restores the chip
   > Did any setting change reach the Elektron/Oxi on channel 16?
 
 ## Other notes

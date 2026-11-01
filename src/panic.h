@@ -14,12 +14,12 @@ class UsbMidi;
  *  channels, 3 = plus a note-off for every note on every channel. Every panic also sends
  *  Stop. Messages are fed as the output queues have room, so MIDI input keeps flowing.
  *
- *  Automatic release: notes from a USB device that is unplugged, notes from DIN when its
- *  Active Sensing stops, and notes held longer than kStuckMillis. */
+ *  Automatic release: notes from a USB device that is unplugged, and notes from DIN when its
+ *  Active Sensing stops. Long notes are never cut on a timer: long pads are played on purpose
+ *  (decided 2026-11-01). */
 class Panic
 {
 public:
-  static constexpr uint32_t kStuckMillis = 30000;       ///< auto-release (decided 2026-11-01)
   static constexpr uint32_t kActiveSensingMillis = 300; ///< MIDI spec
   static constexpr uint8_t kOwner = 16;                 ///< Origin::internal owner id
 
@@ -78,6 +78,5 @@ private:
   bool _usbWasConnected = false;
   bool _dinSensing = false;
   uint32_t _lastSensingMillis = 0;
-  uint32_t _lastStuckCheck = 0;
   uint32_t _lastSummary = 0;
 };

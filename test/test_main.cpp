@@ -689,13 +689,12 @@ static void testPanic()
   run(1);
   CHECK(!rig.tracker.isHeld(MidiOutput::Din, 0, 40) && rig.tracker.isHeld(MidiOutput::Din, 0, 41));
 
-  // Notes held for 30 s are released automatically
-  gFakeMillis += 31000;
+  // Long notes are never cut on a timer (long pads are played on purpose)
+  gFakeMillis += 120000;
   rig.dinBytes();
   run(1);
-  out = rig.dinBytes();
-  CHECK(out == std::vector<uint8_t>({0x80, 41, 0}));
-  CHECK(rig.tracker.heldCount(MidiOutput::Din) == 0 && panic.summary().autoReleased == 2);
+  CHECK(rig.dinBytes().empty() && rig.tracker.isHeld(MidiOutput::Din, 0, 41));
+  CHECK(panic.summary().autoReleased == 1);
 }
 
 static void testLoopProtection()

@@ -10,7 +10,7 @@
 >
 > * The global trigger is the **power button**, as recommended.
 > * Panic also sends **Stop** (`FC`).
-> * Stuck notes are **released automatically** after the threshold (default 30 s), not just warned about.
+> * ~~Stuck notes are released automatically after 30 s~~ — removed after hardware testing (2026-11-01): long pads are held on purpose, so notes are never cut on a timer.
 
 Get rid of stuck notes quickly, prevent them from happening, and show what
 OxiMate is doing. This stage also defines the **note tracker** and a single
