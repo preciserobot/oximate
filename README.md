@@ -39,6 +39,7 @@ synth.
 | 19 | [Extra controls](#stage-19-extra-controls) | — | idea |
 | 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | idea |
 | 21 | [Chord detector](#stage-21-chord-detector) | — | planned (full plan) |
+| 22 | [Phrase tracker](#stage-22-phrase-tracker) | — | idea (questions open) |
 
 Details for each stage are in [Stages](#stages).
 
@@ -495,6 +496,24 @@ Measure the quality of incoming MIDI clock on USB and DIN.
 The vibration motor pulses on the beat, together with the LED bar, for
 practice without headphones.
 
+The same motor can give other cues that work without looking at the
+screen. Each is opt-in:
+
+* phrase start and "phrase ending soon" (stage 22)
+* a count-in before Start
+* clock **lost**, or locked again after being lost, when following an
+  external clock
+* a short tick when a touch button or chip is pressed (the touch buttons
+  are flat, so you can't feel them)
+* confirmation of a panic, and a warning before a stuck note is released
+* "feel the kick": a pulse on chosen notes, e.g. the kick drum on channel 10
+* right or wrong answer in the ear trainer (stage 7)
+* low battery
+
+The motor is switched through the power chip over I2C, so it's driven from
+the UI thread with a few milliseconds of latency. That's fine for cues, but
+not sample-accurate. It also buzzes audibly, which may matter near a mic.
+
 ### Stage 11: MIDI effects
 
 Arpeggiator, chord generator, scale quantiser, transpose, velocity curves and
@@ -643,6 +662,34 @@ the Oxi One, the M8 or an Elektron sequencer.
   runs, the chord name also appears on the Oxi One's screen.
 
 **Full plan:** [docs/stages/stage-21.md](docs/stages/stage-21.md)
+
+### Stage 22: Phrase tracker
+
+Keeps track of phrasing (usually 8 or 16 bars) when playing live, dawless.
+Its own page, built on the stage 8 clock engine, which already counts bars
+from Start in both internal and follow mode.
+
+* **Counting:** bar within the phrase (phrase length 4, 8, 16 or 32 bars),
+  and optionally a higher level ("phrase 3 of 4" in a 64-bar section).
+* **Re-sync:** a "bar 1 now" button, tapped on a downbeat, realigns the count
+  when the master was already running or OxiMate missed its Start. Song
+  Position Pointer from the master realigns it automatically.
+* **Display:** big `9 / 16` counter, a phrase progress bar, and a countdown
+  ("4 bars left"). Optionally named sections ("intro, build, drop") with "drop
+  in 4 bars".
+* **Cues without looking:**
+  * **LEDs:** the 10 LEDs fill across the phrase, change to a warning colour
+    in the last bar or two (time for a fill or transition), and flash on
+    bar 1.
+  * **Vibration:** a pulse on each phrase start, and optionally a double
+    pulse one bar before.
+* **Optional, opt-in automation:** send a message at phrase boundaries, e.g.
+  a program change that switches Elektron patterns (which they queue to the
+  end of the current pattern).
+
+Open questions: which box is the clock master live and does it send Start and
+Song Position; phrase lengths needed; vibration cues and warning lead time;
+named sections; program changes at boundaries.
 
 ## Build and upload
 
