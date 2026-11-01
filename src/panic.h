@@ -37,6 +37,8 @@ public:
   void begin(MidiOutputs &outputs, NoteTracker &tracker, UsbMidi &usb, ClockEngine &clock);
 
   void request(uint8_t level); ///< any task; a higher level replaces a pending lower one
+  /*! Any task: play middle C on channel 1 to DIN OUT (and the SAM2695) for 0.5 s */
+  void requestTestNote();
   Summary summary() const;     ///< any task
 
   // MIDI task
@@ -64,6 +66,8 @@ private:
 
   mutable CriticalSection _lock;
   uint8_t _requested = 0; // guarded by _lock
+  bool _testRequested = false; // guarded by _lock
+  uint32_t _testOffAt = 0;     // MIDI task: when the test note ends (0 = none playing)
   Summary _summary = {};  // guarded by _lock
 
   // MIDI task state

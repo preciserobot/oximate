@@ -36,6 +36,7 @@ void DiagPage::onButton(int index)
 
 void DiagPage::onButtonHold(int index)
 {
+  if (index == 1) _panic.requestTestNote(); // hold B: test note to DIN OUT and the synth
   if (index == 2) _panic.request(3);
 }
 

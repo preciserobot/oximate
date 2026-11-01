@@ -22,6 +22,12 @@ void Panic::request(uint8_t level)
   if (level > _requested) _requested = level > 3 ? 3 : level;
 }
 
+void Panic::requestTestNote()
+{
+  CriticalGuard guard(_lock);
+  _testRequested = true;
+}
+
 Panic::Summary Panic::summary() const
 {
   CriticalGuard guard(_lock);
@@ -86,10 +92,22 @@ void Panic::feed(MidiOutput out)
 void Panic::run(uint32_t nowMillis)
 {
   uint8_t requested;
+  bool testNote;
   {
     CriticalGuard guard(_lock);
     requested = _requested;
     _requested = 0;
+    testNote = _testRequested;
+    _testRequested = false;
+  }
+  if (testNote && !_testOffAt) {
+    uint8_t on[3] = {0x90, 60, 100};
+    _outputs->send(MidiOutput::Din, {MidiSource::Din, 0, on, 3}, Origin::internal(kOwner));
+    _testOffAt = nowMillis + 500;
+  } else if (_testOffAt && (int32_t)(nowMillis - _testOffAt) >= 0) {
+    uint8_t off[3] = {0x80, 60, 0};
+    _outputs->send(MidiOutput::Din, {MidiSource::Din, 0, off, 3}, Origin::internal(kOwner));
+    _testOffAt = 0;
   }
   if (requested) {
     startJob(requested > _level ? requested : _level);

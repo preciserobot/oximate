@@ -110,7 +110,7 @@ the USB Host Module.
 | Monitor | Clear the log | Pause / resume | Show / hide clock messages |
 | Router | All channels on | LED brightness | Default settings |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
-| Diag | Reset counters | Next view | Panic (hold: panic all) |
+| Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
 
 ## Architecture
 
