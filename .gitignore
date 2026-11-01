@@ -34,3 +34,6 @@ libraries/*
 *.out
 *.app
 build/
+
+# IDE
+.vscode/
