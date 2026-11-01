@@ -80,7 +80,7 @@ void Monitor::log(const MidiMessage &msg, bool forwarded, uint16_t totalLength)
   uint16_t color = msg.source == MidiSource::Usb ? kUsbColor : kDinColor;
   addLine(forwarded ? color : kFilteredColor, text);
   // Never wait for the serial port: a burst of messages would stall the UI for 100s of ms
-  if (Serial.availableForWrite() > (int)strlen(text) + 2) Serial.println(text);
+  if (_serialEcho && Serial.availableForWrite() > (int)strlen(text) + 2) Serial.println(text);
 }
 
 void Monitor::addLine(uint16_t color, const char *text)

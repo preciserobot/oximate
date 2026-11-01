@@ -105,6 +105,24 @@ Separate, settings go out on channel 16 to DIN gear too.
 * [ ] Out:Speaker: the Core2's speaker plays the layer channels and the test chord; the chip is silent; switching back to Out:Chip restores the chip
   > Did any setting change reach the Elektron/Oxi on channel 16?
 
+## 9. Clock analyser (stage 9)
+
+The Analyse page sits between Clock and Diag. Measurements run in the
+background; A resets them.
+
+* [ ] Elektron sending clock into DIN: the DIN column shows BPM, interval, jitter; status STABLE or JITTERY
+  > DIN jitter sd and max dev at 120 BPM:
+* [ ] M8 sending clock over USB: the USB column fills in the same way
+  > USB jitter sd, and "B" (batched ticks) on Ticks/run?
+* [ ] Stopping the clock: the status goes to -- after 2 s; Transport shows STOP
+* [ ] Pulling the cable mid-run and plugging it back: Dropouts counts it; the LEDs on that side turn red for 2 s
+* [ ] Start / Stop / Continue from the sequencer: Transport and Ticks/run follow
+* [ ] Histogram view (B): a single peak around 0 for a steady clock
+* [ ] Drift view: a flat line at a fixed tempo; changing the tempo on the sequencer shows a step
+* [ ] Phase view: with both clocks at the same tempo (e.g. OxiMate's clock out to the Elektron and back in, or M8 and Elektron in sync), the DIN-USB offset is shown
+* [ ] LEDs while the page is open: right side = USB, left side = DIN, coloured by status, pulsing every beat
+* [ ] Hold C: CSV lines (`input,tick,time_us,interval_us,batched`) appear in `make log`; hold C again stops them and the normal log returns
+
 ## Other notes
 
 >

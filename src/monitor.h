@@ -11,6 +11,8 @@ class Monitor : public Page
 public:
   void begin();
   void log(const MidiMessage &msg, bool forwarded, uint16_t totalLength);
+  /*! Copy logged lines to the serial port (off while the analyser streams CSV) */
+  void setSerialEcho(bool on) { _serialEcho = on; }
 
   const char *title() const override { return "Monitor"; }
   void buttonLabels(const char *labels[3]) const override;
@@ -35,6 +37,7 @@ private:
 
   bool _paused = false;
   bool _showRealtime = false;
+  bool _serialEcho = true;
 };
 
 /*! Human-readable description of a message, e.g. "USB   1 NoteOn   C4   100".

@@ -26,7 +26,7 @@ synth.
 | 6 | [Preview synth](#stage-6-preview-synth) | ✅ | needs hardware test |
 | 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
-| 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
+| 9 | [Clock analyser](#stage-9-clock-analyser) | ✅ | needs hardware test |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | idea |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | idea |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | idea |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Clock → Diag → Monitor.
+  Router → Synth → Clock → Analyse → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -123,6 +123,7 @@ the USB Host Module.
 | Router | All channels on | LED brightness | Default settings |
 | Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
+| Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
 
 ## Architecture
@@ -530,6 +531,34 @@ Measure the quality of incoming MIDI clock on USB and DIN.
 * Four views: Stats, Histogram, Drift, Phase. LEDs green < 0.5 ms jitter,
   yellow above, red on dropout. CSV over serial.
 
+**Implemented (2026-11-01)**, with these differences from the plan:
+
+* Statistics run in the MIDI task: an `InputHooks` observer feeds clock and
+  transport messages (with their `timeMicros`) into `ClockAnalyser`, one
+  `ClockStats` per input plus `ClockPhase`. The page reads copies taken
+  under a short critical section. All of it runs in the background, so the
+  numbers are ready when the page is opened.
+* **Timestamp resolution is about 1 ms, and the page shows it** ("Res ~1 ms").
+  DIN bytes are stamped when the MIDI task reads the UART, every 1 ms. USB is
+  stamped per transfer (1 ms frames, read every 1 ms; ticks sharing a
+  transfer are counted as "batched" and left out). The per-byte DIN
+  `onReceive` timestamps (plan M2) aren't built: with the 1 ms MIDI task
+  they would improve DIN from ±1 ms to ~0.3 ms. That's worth doing only if
+  sub-millisecond DIN jitter matters. A quantisation of 1 ms adds about
+  0.3 ms to the measured jitter (standard deviation), so "STABLE" (< 0.5 ms)
+  is still reachable.
+* Double-clock detection looks for alternating short/long intervals in the
+  rolling window. A Song Position while running is flagged as `SPP!`.
+* Page buttons: A reset, B view, C the input shown in the graphs (USB/DIN).
+  Holding C toggles CSV streaming (`input,tick,time_us,interval_us,batched`,
+  one line per tick); the Monitor's serial echo and the 2 s status line pause
+  meanwhile. Lines that don't fit the serial buffer are dropped, never
+  waited for.
+* The whole page redraws 4 times per second (graphs included), to keep the
+  shared SPI bus free.
+* LEDs while the page is open: right side = USB, left side = DIN, coloured by
+  status and pulsing on every beat.
+
 **Full plan:** [docs/stages/stage-9.md](docs/stages/stage-9.md)
 
 ### Stage 10: Haptic metronome
@@ -786,6 +815,9 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |
+| `src/clock_stats.*` | clock statistics per input (intervals, jitter, drift, dropouts, transport) and USB-vs-DIN phase |
+| `src/clock_analyser.*` | feeds the statistics from an input observer; copies for the UI; CSV queue |
+| `src/analyser_page.*` | the Analyse page (Stats, Histogram, Drift, Phase) |
 | `src/tap_tempo.h`   | tap tempo averaging |
 | `src/platform_time.h` | 64-bit microsecond clock (esp_timer) |
 | `src/ui.*`          | page switching, header and footer |
