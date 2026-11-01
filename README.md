@@ -252,6 +252,12 @@ Every input goes to every output, except back to the port it came from:
   full (up to 1024 bytes; longer messages are dropped) and sent in one piece.
   Realtime bytes (clock, start/stop) pass through immediately.
 * DIN input handles running status. Output never uses running status.
+* **Loop protection:** a device connected both ways (DIN OUT → device →
+  DIN IN) that echoes its input (MIDI thru) would otherwise make the software
+  thru send the same messages round forever, flooding DIN and the SAM2695.
+  A channel message arriving on DIN IN that matches one sent to DIN OUT in the
+  last 50 ms is treated as an echo and not forwarded (counted on the Diag
+  page as "loop echoes").
 * USB cable numbers are kept, so DIN-to-USB messages go to cable 0.
 * DIN carries about 3000 bytes per second. A USB device can send faster than
   that, so a 1 KB transmit buffer absorbs bursts. Sustained overload will slow

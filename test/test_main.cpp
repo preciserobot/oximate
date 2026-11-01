@@ -289,6 +289,7 @@ static void testRouter()
   CHECK(r.route(dinNote)); // DIN -> DIN still counts
   CHECK(!rig.tracker.isHeld(MidiOutput::Usb, 0, 64));
   rig.usb.poll();
+  gFakeMicros += 100000; // later than the loop-protection window: not an echo of the first one
   CHECK(r.route(dinNote));
   CHECK(rig.tracker.isHeld(MidiOutput::Usb, 0, 64));
 }
@@ -695,6 +696,25 @@ static void testPanic()
   CHECK(rig.tracker.heldCount(MidiOutput::Din) == 0 && panic.summary().autoReleased == 2);
 }
 
+static void testLoopProtection()
+{
+  OutputRig rig;
+  gFakeMicros = 1000000;
+  // A note we send to DIN OUT comes straight back on DIN IN (device with MIDI thru)
+  CHECK(rig.router.route(msg(MidiSource::Usb, {0x90, 60, 100})));
+  rig.dinBytes();
+  gFakeMicros += 5000;
+  MidiMessage echo = msg(MidiSource::Din, {0x90, 60, 100});
+  echo.timeMicros = gFakeMicros;
+  CHECK(!rig.router.route(echo)); // dropped: not sent out again
+  CHECK(rig.dinBytes().empty() && rig.outputs.counters().echoesBlocked == 1);
+  // The same note played on the DIN device later is a real note
+  gFakeMicros += 100000;
+  echo.timeMicros = gFakeMicros;
+  CHECK(rig.router.route(echo));
+  CHECK(rig.dinBytes() == std::vector<uint8_t>({0x90, 60, 100}));
+}
+
 static void testRouterReleasesOnChange()
 {
   OutputRig rig;
@@ -731,6 +751,7 @@ int main()
   testPanic();
   gRunRig = nullptr;
   testRouterReleasesOnChange();
+  testLoopProtection();
   testRouterMigration();
   printf("%d checks, %d failures\n", gChecks, gFailures);
   return gFailures ? 1 : 0;

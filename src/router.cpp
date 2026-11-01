@@ -99,6 +99,10 @@ bool Router::route(const MidiMessage &msg)
   if (!passes(config, msg)) {
     return false;
   }
+  // A device on DIN echoing our own DIN output would loop forever through the software thru
+  if (msg.source == MidiSource::Din && _outputs->isEcho(msg, msg.timeMicros ? msg.timeMicros : micros())) {
+    return false;
+  }
 
   // Channel rewrite works on a copy; the input's buffer stays untouched
   uint8_t remapped[3];

@@ -183,7 +183,8 @@ void DiagPage::drawSystem()
   snprintf(text, sizeof(text), " USB       dropped %lu  bus busy %lu", (unsigned long)_usb.counters().txDropped,
            (unsigned long)_usb.counters().busBusy);
   line(5, text);
-  snprintf(text, sizeof(text), " UI events dropped %lu", (unsigned long)_eventsDropped);
+  snprintf(text, sizeof(text), " UI drop %lu  loop echoes %lu", (unsigned long)_eventsDropped,
+           (unsigned long)_outputs.counters().echoesBlocked);
   line(6, text);
   snprintf(text, sizeof(text), " UI loop   avg %lu us  max %lu us", (unsigned long)_loopAvgShown,
            (unsigned long)_loopMaxShown);

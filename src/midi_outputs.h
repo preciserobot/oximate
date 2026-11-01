@@ -38,13 +38,21 @@ public:
   {
     uint32_t messages[2] = {0, 0}; ///< per MidiOutput
     uint32_t bytes[2] = {0, 0};
+    uint32_t echoesBlocked = 0;    ///< DIN input dropped as an echo of our own DIN output
   };
+
+  static constexpr uint32_t kEchoWindowMicros = 50000;
 
   void begin(DinMidi &din, UsbMidi &usb, NoteTracker &tracker);
   void send(MidiOutput out, const MidiMessage &msg, Origin origin);
   bool available(MidiOutput out) const; ///< false while no USB device is connected
   bool hasSpace(MidiOutput out, uint16_t length) const; ///< a message of `length` bytes fits now
   NoteTracker &tracker() { return *_tracker; }
+
+  /*! True if `msg` (from DIN IN) is a copy of a channel message we sent to DIN OUT within
+   *  kEchoWindowMicros: a device echoing our output back (MIDI thru), which would otherwise
+   *  loop forever through the software thru. Each sent message can match once. */
+  bool isEcho(const MidiMessage &msg, uint32_t nowMicros);
 
   const Counters &counters() const { return _counters; }
 
@@ -53,4 +61,14 @@ private:
   UsbMidi *_usb = nullptr;
   NoteTracker *_tracker = nullptr;
   Counters _counters;
+
+  struct Sent
+  {
+    uint32_t timeMicros;
+    uint8_t length; // 0 = free
+    uint8_t bytes[3];
+  };
+  static constexpr int kSentHistory = 32;
+  Sent _sent[kSentHistory] = {};
+  int _sentNext = 0;
 };
