@@ -10,6 +10,11 @@
 > **Decided 2026-11-01:**
 >
 > * Elektron gear on DIN OUT responds on all channels, and **program changes on channel 16 would switch Elektron patterns** in Separate mode. Show a warning on the Synth page, and document turning off PC receive on the Elektron or using Bypass mode.
+>
+> **Decided 2026-11-01:** add an output choice, "synth chip / built-in
+> speaker". Speaker mode plays previews with a small software synth on the
+> Core2 through its own speaker (see README stage 6), since the SAM2695's
+> audio can't reach the Core2. Nothing is sent to DIN OUT in that mode.
 
 Turns the SAM2695 in the Unit MIDI into a controlled sound source:
 * choose which channels it plays

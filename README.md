@@ -414,6 +414,16 @@ external gear on DIN OUT.
 * The bundled M5-SAM2695 library is not used: two of its SysEx messages are
   wrong and its `reset()` sends System Reset to all gear. Bytes go out raw.
 * Settings in NVS under their own key (`synth`).
+* **Output choice (decided 2026-11-01):** "Preview sound: synth chip / built-in
+  speaker". The SAM2695's audio only reaches the Unit MIDI's headphone jack
+  (the Grove cable carries no audio), so speaker mode uses a small software
+  synth on the Core2 played through its own speaker (M5Unified `Speaker`):
+  * a few voices of simple waveforms, or short samples from the SD card
+  * about 10–20 ms latency; small mono speaker, fine for previews, the ear
+    trainer (stage 7), metronome clicks (stage 10) and a tuning tone
+  * the speaker and the microphone can't be used at the same time
+  * in speaker mode nothing is sent to DIN OUT for the preview, which also
+    avoids the shared-wire problem with external gear
 
 **Full plan:** [docs/stages/stage-6.md](docs/stages/stage-6.md)
 
