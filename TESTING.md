@@ -17,6 +17,9 @@ How to use this file:
 
 Before starting: set the Unit MIDI's front switch to **Separate**.
 
+Items marked **MUST** have to pass before the next stages (6, 5, 7, 3, 4, 9)
+are built on top; the rest can be checked along the way.
+
 ## 1. Basics (must pass before moving on)
 
 * [x] The start-up screen (red "oximate" banner) shows for about 3 s, then the Monitor page appears
@@ -33,27 +36,27 @@ Before starting: set the Unit MIDI's front switch to **Separate**.
 
 ## 2. Router page
 
-* [ ] Turning a route off (e.g. USB>DIN) stops that traffic
+* [ ] **MUST** Turning a route off (e.g. USB>DIN) stops that traffic
 * [ ] A blocked channel stops passing, and its Monitor lines turn grey
-* [ ] Force channel works (e.g. USB>ch5)
-* [ ] Holding a note while changing force channel or blocking its channel: no stuck note
-* [ ] Settings are still there after a power cycle
+* [ ] **MUST** Force channel works (e.g. USB>ch5)
+* [ ] **MUST** Holding a note while changing force channel or blocking its channel: no stuck note
+* [ ] **MUST** Settings are still there after a power cycle
 
 ## 3. Clock page
 
-* [ ] Start/Stop sends clock to the M8 over USB (the M8 follows the tempo and starts/stops)
-* [ ] Outputs view: switching DIN clock on makes the Elektron follow over DIN
+* [ ] **MUST** Start/Stop sends clock to the M8 over USB (the M8 follows the tempo and starts/stops)
+* [ ] **MUST** Outputs view: switching DIN clock on makes the Elektron follow over DIN
 * [ ] The tempo chips (±1, ±0.1) and tap tempo (B) change the tempo
 * [ ] The LEDs show beat and bar while the Clock page is open
-* [ ] Source DIN with the Elektron sending clock: tempo shown, rightmost LED turns blue (locked)
-* [ ] Stopping or unplugging the Elektron's clock: the display shows LOST and OxiMate stops
+* [ ] **MUST** Source DIN with the Elektron sending clock: tempo shown, rightmost LED turns blue (locked)
+* [ ] **MUST** Stopping or unplugging the Elektron's clock: the display shows LOST and OxiMate stops
 * [ ] Clock settings are still there after a power cycle
 
 ## 4. Panic and stuck notes
 
-* [ ] Short power-button press: PANIC in the header, LEDs flash red, held notes stop
+* [ ] **MUST** Short power-button press: PANIC in the header, LEDs flash red, held notes stop
 * [ ] Holding the power button ~1.5 s: PANIC ALL, the red LED bar fills over about 2 s
-* [ ] Holding a note on a USB keyboard and unplugging it: the note stops on DIN
+* [ ] **MUST** Holding a note on a USB keyboard and unplugging it: the note stops on DIN
 * [ ] A note held for more than 30 s is released automatically
   > Is the 30 s auto-release OK for drones/pads you hold on purpose?
 
@@ -61,7 +64,7 @@ Before starting: set the Unit MIDI's front switch to **Separate**.
 
 * [ ] Channel view shows activity; channels 1–10 light up on the LEDs
 * [ ] Counters go up while playing; A resets them
-* [ ] System view while playing heavily:
+* [ ] **MUST** System view while playing heavily:
   > UI loop max:
   > USB bus busy:
   > UI events dropped:
