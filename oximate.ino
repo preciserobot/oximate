@@ -29,6 +29,7 @@
 #include "src/diag_page.h"
 #include "src/diagnostics.h"
 #include "src/din_midi.h"
+#include "src/input_observers.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
 #include "src/midi_task.h"
@@ -68,7 +69,9 @@ DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 /*! Every complete message from any input arrives here, in the MIDI task */
 void onMidi(const MidiMessage &msg)
 {
-  bool forwarded = router.route(msg);
+  // Interceptors (e.g. a pad controller playing the drum machine) may consume a message
+  bool forwarded = !InputHooks::intercept(msg) && router.route(msg);
+  InputHooks::observe(msg, forwarded);
   stats.observe(msg, forwarded, millis());
   panic.observe(msg);
   MidiTask::events().push(msg, forwarded);
@@ -134,7 +137,7 @@ void setup()
 
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
-  MidiTask::start(usbMidi, dinMidi, clockEngine);
+  MidiTask::start(usbMidi, dinMidi, clockEngine, outputs);
   Serial.printf("OxiMate running (DIN on GPIO RX %d / TX %d)\n", dinMidi.rxPin(), dinMidi.txPin());
 }
 
@@ -242,6 +245,7 @@ void loop()
     MidiMessage msg = event.message();
     leds.activity(msg);
     feedSpeaker(msg, event.forwarded);
+    ui.onMidi(msg, event.forwarded);
     monitor.log(msg, event.forwarded, event.length);
   }
 

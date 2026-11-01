@@ -37,6 +37,32 @@ bool EventRing::pop(MidiEvent &event)
   return true;
 }
 
+bool SendQueue::push(MidiOutput out, const uint8_t *bytes, uint8_t length, Origin origin)
+{
+  if (length == 0 || length > kMaxBytes) return false;
+  size_t head = _head.load(std::memory_order_relaxed);
+  size_t next = (head + 1) % kLength;
+  if (next == _tail.load(std::memory_order_acquire)) return false;
+  Item &item = _items[head];
+  item.out = out;
+  item.origin = origin;
+  item.length = length;
+  memcpy(item.bytes, bytes, length);
+  _head.store(next, std::memory_order_release);
+  return true;
+}
+
+void SendQueue::drain(MidiOutputs &outputs)
+{
+  size_t tail = _tail.load(std::memory_order_relaxed);
+  while (tail != _head.load(std::memory_order_acquire)) {
+    const Item &item = _items[tail];
+    outputs.send(item.out, {MidiSource::Din, 0, item.bytes, item.length}, item.origin);
+    tail = (tail + 1) % kLength;
+    _tail.store(tail, std::memory_order_release);
+  }
+}
+
 #if defined(ESP_PLATFORM)
 #include <Arduino.h>
 #include <esp_timer.h>
@@ -47,6 +73,8 @@ static EventRing gEvents;
 static UsbMidi *gUsb = nullptr;
 static DinMidi *gDin = nullptr;
 static ClockEngine *gClock = nullptr;
+static MidiOutputs *gOutputs = nullptr;
+static SendQueue gSendQueue;
 static TaskHandle_t gTask = nullptr;
 static esp_timer_handle_t gTimer = nullptr;
 static void (*gHook)(uint32_t) = nullptr;
@@ -69,13 +97,20 @@ static void run(void *)
     gClock->runDue(nowMicros64());
     gDin->poll();
     gUsb->poll();
+    gSendQueue.drain(*gOutputs);
     if (gHook) gHook(millis());
     gDin->pumpTx();
   }
 }
 
-void MidiTask::start(UsbMidi &usb, DinMidi &din, ClockEngine &clock)
+bool MidiTask::send(MidiOutput out, const uint8_t *bytes, uint8_t length, Origin origin)
 {
+  return gSendQueue.push(out, bytes, length, origin);
+}
+
+void MidiTask::start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs &outputs)
+{
+  gOutputs = &outputs;
   gUsb = &usb;
   gDin = &din;
   gClock = &clock;

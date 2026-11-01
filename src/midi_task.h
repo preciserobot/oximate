@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include "midi_message.h"
+#include "midi_outputs.h"
 
 /*! A routed message as seen by the UI (monitor, LEDs, header).
  *  SysEx keeps only its first bytes plus the total length. */
@@ -39,6 +40,31 @@ private:
   std::atomic<uint32_t> _dropped{0};
 };
 
+/*! Single-producer (UI) / single-consumer (MIDI task) queue of messages to send, so pages can
+ *  play notes without touching MidiOutputs from the wrong core. Messages up to kMaxBytes. */
+class SendQueue
+{
+public:
+  static constexpr size_t kLength = 64;
+  static constexpr uint8_t kMaxBytes = 16;
+
+  struct Item
+  {
+    MidiOutput out;
+    Origin origin;
+    uint8_t length;
+    uint8_t bytes[kMaxBytes];
+  };
+
+  bool push(MidiOutput out, const uint8_t *bytes, uint8_t length, Origin origin); ///< UI; false if full
+  void drain(MidiOutputs &outputs);                                               ///< MIDI task
+
+private:
+  Item _items[kLength];
+  std::atomic<size_t> _head{0};
+  std::atomic<size_t> _tail{0};
+};
+
 class UsbMidi;
 class DinMidi;
 class ClockEngine;
@@ -52,7 +78,9 @@ constexpr int kCore = 0;      ///< see README "Shared infrastructure" (radio sta
 constexpr int kPriority = 10; ///< above loopTask (1), below the radio stacks (18-23)
 constexpr uint32_t kStackBytes = 8192;
 
-void start(UsbMidi &usb, DinMidi &din, ClockEngine &clock);
+void start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs &outputs);
+/*! UI side: send a message from the MIDI task (sent within ~1 ms); false if the queue is full */
+bool send(MidiOutput out, const uint8_t *bytes, uint8_t length, Origin origin);
 /*! Extra work for every task loop (router hand-over, panic, statistics); set before start() */
 void setLoopHook(void (*hook)(uint32_t nowMillis));
 EventRing &events();

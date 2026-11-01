@@ -231,9 +231,12 @@ output with realtime priority, timestamps on every message, `MidiOutputs`
 and `NoteTracker`, and the router sending through them with its settings
 handed over safely between cores. The `ClockEngine` with its
 `esp_timer` wake-up and LED claims came with stage 8; the panic job, LED
-overlay and the MIDI task loop hook with stage 16. Not built yet: input
-interceptors/observers as a general mechanism (stage 16 observes input
-directly in `onMidi()`).
+overlay and the MIDI task loop hook with stage 16. Input hooks
+(`src/input_observers.h`: interceptors that may consume a message before
+routing, observers after routing, both in the MIDI task),
+`Page::onMidi()` for the visible page on the UI side, and
+`MidiTask::send()` (a queue for pages to send MIDI from the UI thread) were
+added before stages 5, 7 and 9.
 
 **Suggested build order:** first the stage 8 timing core (its milestones 1–2)
 and the stage 16 output layer (its milestone 1). These are the foundation.
@@ -748,7 +751,10 @@ make test     # host build of the parsers, router, note tracker, output queues a
 ```
 
 The tests compile the hardware-independent modules on the Mac against the
-stand-ins in `test/stubs/`.
+stand-ins in `test/stubs/`. Shared helpers live in `test/test_support.h`. Each
+stage adds a `test/test_<stage>.cpp` with `TEST(name) { ... }` blocks (they
+register themselves), and lists its host-testable sources in
+`test/sources_<stage>.mk` as `TEST_SOURCES += src/...cpp`.
 
 ### USB Host Shield 2.0 (patched)
 

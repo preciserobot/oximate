@@ -1,0 +1,36 @@
+// Tests for shared infrastructure: input hooks and the UI -> MIDI task send queue
+#include "test_support.h"
+#include "input_observers.h"
+
+TEST(testSendQueue)
+{
+  OutputRig rig;
+  static SendQueue queue;
+  uint8_t note[3] = {0x95, 60, 90};
+  CHECK(queue.push(MidiOutput::Din, note, 3, Origin::internal(7)));
+  CHECK(rig.dinBytes().empty()); // nothing until the MIDI task drains it
+  queue.drain(rig.outputs);
+  CHECK(rig.dinBytes() == std::vector<uint8_t>({0x95, 60, 90}));
+  CHECK(rig.tracker.isHeld(MidiOutput::Din, 5, 60));
+  int pushed = 0;
+  while (queue.push(MidiOutput::Din, note, 3, Origin::internal(7))) pushed++;
+  CHECK(pushed == SendQueue::kLength - 1);
+}
+
+static int gObserved = 0;
+static bool consumeChannel16(const MidiMessage &msg, void *) { return msg.isChannel() && msg.channel() == 16; }
+static void countObserved(const MidiMessage &, bool forwarded, void *) { gObserved += forwarded ? 10 : 1; }
+
+TEST(testInputHooks)
+{
+  InputHooks::registry() = InputHooks::Registry();
+  InputHooks::addInterceptor(consumeChannel16, nullptr);
+  InputHooks::addObserver(countObserved, nullptr);
+  uint8_t a[3] = {0x9F, 60, 1}, b[3] = {0x90, 60, 1};
+  CHECK(InputHooks::intercept({MidiSource::Usb, 0, a, 3}));
+  CHECK(!InputHooks::intercept({MidiSource::Usb, 0, b, 3}));
+  InputHooks::observe({MidiSource::Usb, 0, b, 3}, true);
+  InputHooks::observe({MidiSource::Usb, 0, a, 3}, false);
+  CHECK(gObserved == 11);
+  InputHooks::registry() = InputHooks::Registry();
+}

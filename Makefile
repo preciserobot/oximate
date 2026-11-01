@@ -23,8 +23,10 @@ send:
 
 
 # Host unit tests (no hardware needed)
-TEST_SOURCES = test/test_main.cpp src/din_midi.cpp src/usb_midi.cpp src/router.cpp \
+TEST_SOURCES = $(wildcard test/test_*.cpp) src/din_midi.cpp src/usb_midi.cpp src/router.cpp \
 	src/midi_outputs.cpp src/note_tracker.cpp src/midi_task.cpp src/clock_engine.cpp src/panic.cpp src/sam_synth.cpp
+# Stages add their host-testable sources in test/sources_*.mk (TEST_SOURCES += ...)
+-include $(wildcard test/sources_*.mk)
 test:
 	mkdir -p build
 	c++ -std=c++17 -Wall -Wno-unused-private-field -Itest/stubs -Isrc $(TEST_SOURCES) -o build/tests

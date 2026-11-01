@@ -51,6 +51,9 @@ public:
   virtual void enter() { _dirty = true; }   ///< page became visible
   virtual void leave() {}                   ///< another page is about to be shown
   virtual void tick() {}                    ///< every loop while visible (animations, LEDs)
+  /*! Every input message drained from the MIDI task while this page is visible (UI thread;
+   *  routing has already happened). For exact timing use an InputHooks observer instead. */
+  virtual void onMidi(const MidiMessage &msg, bool forwarded) {}
   /*! Redraw the content area (only called when dirty()) on canvas(), a full-screen off-screen
    *  buffer: draw with the usual screen coordinates. The Ui pushes the content area afterwards,
    *  in slices, so the shared SPI bus is never held long. */
@@ -91,6 +94,10 @@ public:
   void addPage(Page &page);
   void poll();                ///< handle buttons and touch, redraw what changed
   void footerChanged() { _footerDirty = true; }
+  void onMidi(const MidiMessage &msg, bool forwarded) ///< pass to the visible page
+  {
+    if (_pageCount) _pages[_current]->onMidi(msg, forwarded);
+  }
   void setUsbDevice(bool connected, uint16_t vid, uint16_t pid);
   /*! Show a short message in the header's right side for `millis` (e.g. "PANIC") */
   void flash(const char *text, uint16_t color, uint32_t millis);
