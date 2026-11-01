@@ -28,18 +28,18 @@ synth.
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | ✅ | needs hardware test |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | planned (full plan) |
-| 11 | [MIDI effects](#stage-11-midi-effects) | — | idea |
+| 11 | [MIDI effects](#stage-11-midi-effects) | — | planned (full plan) |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | planned (full plan) |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | planned (full plan) |
-| 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | idea |
-| 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | idea |
+| 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | planned (full plan) |
+| 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | planned (full plan) |
 | 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
-| 17 | [BLE MIDI](#stage-17-ble-midi) | — | idea |
-| 18 | [Network MIDI](#stage-18-network-midi) | — | idea |
-| 19 | [Extra controls](#stage-19-extra-controls) | — | idea |
+| 17 | [BLE MIDI](#stage-17-ble-midi) | — | planned (full plan) |
+| 18 | [Network MIDI](#stage-18-network-midi) | — | planned (full plan) |
+| 19 | [Extra controls](#stage-19-extra-controls) | — | planned (full plan) |
 | 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | idea |
 | 21 | [Chord detector](#stage-21-chord-detector) | — | planned (full plan) |
-| 22 | [Phrase tracker](#stage-22-phrase-tracker) | — | idea (questions open) |
+| 22 | [Phrase tracker](#stage-22-phrase-tracker) | — | planned (full plan) |
 
 Details for each stage are in [Stages](#stages).
 
@@ -660,6 +660,9 @@ Arpeggiator, chord generator, scale quantiser, transpose, velocity curves and
 CC scaling. They're applied in the merge path between input and output, so
 they combine with the router's settings.
 
+**Plan (2026-11-01):** Per-input effect chains after the router's filters: transpose → scale quantise → chord → arpeggiator (clock-synced, latch) → velocity curve → CC scale/smoothing. Each input note remembers what it produced, so note-offs are always right, even when settings change. FX page, 8 presets.
+**Full plan:** [docs/stages/stage-11.md](docs/stages/stage-11.md)
+
 ### Stage 12: Generative sequencers
 
 Euclidean rhythms, with the hits shown around the "ring" of 10 LEDs. A
@@ -695,9 +698,15 @@ works. Needs a microSD card in the Core2.
 Send `.syx` files from the SD card and capture SysEx dumps from devices. The
 Subharmonicon files in `subH_sysex_user/` are the first test case.
 
+**Plan (2026-11-01):** Send `.syx` files from SD with gaps between messages (default 20 ms), streaming past the 1024-byte SysEx limit. Capture dumps from DIN or USB into PSRAM, ended after 2 s of silence and saved byte-exact. Every send names its output, and there's a warning before universal SysEx. Test case: the Subharmonicon files.
+**Full plan:** [docs/stages/stage-14.md](docs/stages/stage-14.md)
+
 ### Stage 15: Setlist / scenes
 
 Send program changes and CC snapshots to several devices with one touch.
+
+**Plan (2026-11-01):** Scenes of program changes and CC snapshots per device, plus optional OxiMate snapshots (tempo, routing, synth, drums, FX). Recall now, at the next bar or at the next phrase. Program changes are off per device by default (Elektron safety), with an optional lead time. Live view: A previous, B recall, C next.
+**Full plan:** [docs/stages/stage-15.md](docs/stages/stage-15.md)
 
 ### Stage 16: Panic & diagnostics
 
@@ -737,15 +746,24 @@ Get out of stuck-note situations quickly, and see what's going on.
 Wireless MIDI to and from an iPad or Mac. The ESP32 supports BLE MIDI
 natively, and the `BLE-MIDI`/NimBLE libraries are already installed.
 
+**Plan (2026-11-01):** BLE MIDI peripheral (iPad/Mac) on NimBLE 2.x, using our own thin transport because the installed BLE-MIDI library doesn't match NimBLE 2.x. The MIDI task moves to core 1 while a radio is on. Also covers the shared groundwork: more inputs and outputs, a route matrix (RouterConfig v3), and a Radio page with a mode chosen at boot.
+**Full plan:** [docs/stages/stage-17.md](docs/stages/stage-17.md)
+
 ### Stage 18: Network MIDI
 
 RTP-MIDI / AppleMIDI over Wi-Fi. This probably can't run at the same time as
 BLE MIDI (see Architecture).
 
+**Plan (2026-11-01):** RTP-MIDI/AppleMIDI, found by the Mac's Audio MIDI Setup over mDNS. OxiMate is its own access point by default, or joins a studio network. Wi-Fi power save is off for latency, which costs about 100 mA. Only one radio runs at a time; switching reboots.
+**Full plan:** [docs/stages/stage-18.md](docs/stages/stage-18.md)
+
 ### Stage 19: Extra controls
 
 Add M5 Grove units (8-Encoder, Dual Button, Angle) as physical knobs and
 buttons alongside the touch buttons.
+
+**Plan (2026-11-01):** Grove units on Port A (its own I2C bus, separate from the internal one): 8Encoder recommended, 8Angle, Joystick2; Fader or Dual Button on Port B. Polled from an I/O task on core 1. The 8Encoder's switch selects page-control mode or learnable MIDI CC mode. Shares the bus with the stage 20 CV board.
+**Full plan:** [docs/stages/stage-19.md](docs/stages/stage-19.md)
 
 ### Stage 20: DFAM MIDI-to-CV
 
@@ -850,6 +868,9 @@ from Start in both internal and follow mode.
 Open questions: which box is the clock master live and does it send Start and
 Song Position; phrase lengths needed; vibration cues and warning lead time;
 named sections; program changes at boundaries.
+
+**Plan (2026-11-01):** Counts bars from the clock engine (bar in phrase, phrase in section), with a "Bar 1" resync button, Song Position realign, and `?` while the phrase position is unknown. Big counter, progress bar and countdown; LEDs fill and warn before the phrase end; vibration cues through stage 10. Defaults assumed until answered: 16 bars, 4 phrases, 1-bar warning.
+**Full plan:** [docs/stages/stage-22.md](docs/stages/stage-22.md)
 
 ## Build and upload
 
