@@ -43,7 +43,12 @@ public:
 
   static constexpr uint32_t kEchoWindowMicros = 50000;
 
+  /*! Called for every message actually sent (MIDI task) */
+  using Listener = void (*)(MidiOutput out, const MidiMessage &msg, Origin origin, void *ctx);
+  static constexpr int kMaxListeners = 4;
+
   void begin(DinMidi &din, UsbMidi &usb, NoteTracker &tracker);
+  void addListener(Listener listener, void *ctx);
   void send(MidiOutput out, const MidiMessage &msg, Origin origin);
   bool available(MidiOutput out) const; ///< false while no USB device is connected
   bool hasSpace(MidiOutput out, uint16_t length) const; ///< a message of `length` bytes fits now
@@ -61,6 +66,9 @@ private:
   UsbMidi *_usb = nullptr;
   NoteTracker *_tracker = nullptr;
   Counters _counters;
+  Listener _listeners[kMaxListeners];
+  void *_listenerCtx[kMaxListeners];
+  int _listenerCount = 0;
 
   struct Sent
   {

@@ -36,11 +36,11 @@ are built on top; the rest can be checked along the way.
 
 ## 2. Router page
 
-* [ ] **MUST** Turning a route off (e.g. USB>DIN) stops that traffic
+* [x] **MUST** Turning a route off (e.g. USB>DIN) stops that traffic
 * [ ] A blocked channel stops passing, and its Monitor lines turn grey
-* [ ] **MUST** Force channel works (e.g. USB>ch5)
-* [ ] **MUST** Holding a note while changing force channel or blocking its channel: no stuck note
-* [ ] **MUST** Settings are still there after a power cycle
+* [x] **MUST** Force channel works (e.g. USB>ch5)
+* [x] **MUST** Holding a note while changing force channel or blocking its channel: no stuck note
+* [x] **MUST** Settings are still there after a power cycle
 
 ## 3. Clock page
 
@@ -68,6 +68,27 @@ are built on top; the rest can be checked along the way.
   > UI loop max:
   > USB bus busy:
   > UI events dropped:
+
+## 6. Synth page (stage 6)
+
+Headphones on the Unit MIDI. Note the PC/CC warning: with the switch on
+Separate, settings go out on channel 16 to DIN gear too.
+
+- [ ] Synth page appears between Router and Clock
+- [ ] Mode All: the synth plays every channel as before
+- [ ] Mode Layers: layer 1 (ch1, piano) plays from a keyboard on channel 1; a keyboard on channel 2 is silent on the synth
+- [ ] Layer 2 also on ch1 with strings: piano and strings stack
+- [ ] B on a layer row plays a test chord with that layer's sound
+- [ ] Browser (B on an instrument cell): tapping a sound previews it; C selects it; A goes back unchanged
+- [ ] MT-32 bank (B in the browser) sounds different from GM
+- [ ] Drum layer: each of the 5 kits plays (B on the drum row)
+  > Does the CM-64/32 kit sound?
+- [ ] Volume, reverb send, master volume, reverb type/level and chorus change the sound
+- [ ] Voices Full / Lite / Dry: reverb and chorus switch off in Lite / Dry
+- [ ] Mode Off: the synth is silent; DIN OUT still works
+- [ ] Settings survive a power cycle (the layers come back after power-on)
+- [ ] Panic or a System Reset from your gear: the synth comes back with your layers within a moment
+  > Did any setting change reach the Elektron/Oxi on channel 16?
 
 ## Other notes
 

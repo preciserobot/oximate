@@ -1,5 +1,6 @@
 // Host unit tests for the hardware-independent parts of OxiMate.
 // Build and run with `make test` (uses the stubs in test/stubs).
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -17,6 +18,7 @@
 #include "note_tracker.h"
 #include "panic.h"
 #include "router.h"
+#include "sam_synth.h"
 #include "tap_tempo.h"
 #include "usb_midi.h"
 #undef private
@@ -228,7 +230,7 @@ struct OutputRig
   }
   std::vector<uint8_t> dinBytes()
   {
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 5000 && !(din._queue.empty() && din._realtime.empty()); i++) {
       serial.drain(128);
       din.pumpTx();
     }
@@ -735,6 +737,94 @@ static void testRouterReleasesOnChange()
   CHECK(rig.dinBytes().empty() && rig.tracker.isHeld(MidiOutput::Din, 4, 61));
 }
 
+static bool contains(const std::vector<uint8_t> &haystack, std::vector<uint8_t> needle)
+{
+  return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end()) != haystack.end();
+}
+
+static std::vector<uint8_t> gsBytes(uint8_t a1, uint8_t a2, uint8_t a3, uint8_t v)
+{
+  uint8_t b[11];
+  SamSynth::gsMessage(b, a1, a2, a3, v);
+  return std::vector<uint8_t>(b, b + 11);
+}
+
+static void testSamSynth()
+{
+  // GS reset from the datasheet, with the Roland checksum
+  CHECK(gsBytes(0x40, 0x00, 0x7F, 0x00) ==
+        std::vector<uint8_t>({0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7}));
+  CHECK(SamSynth::defaultChannel(0) == 10 && SamSynth::defaultChannel(9) == 9 && SamSynth::defaultChannel(10) == 11);
+  uint8_t ff = 0xFF;
+  CHECK(SamSynth::isReset({MidiSource::Din, 0, &ff, 1}));
+  uint8_t gm[6] = {0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7};
+  CHECK(SamSynth::isReset({MidiSource::Din, 0, gm, 6}));
+
+  OutputRig rig;
+  SamSynth synth;
+  synth.begin(rig.outputs);
+  gFakeMillis = 5000;
+  synth.run(gFakeMillis);
+  CHECK(rig.dinBytes().empty()); // All mode with defaults: nothing sent at boot
+
+  // Layers mode: other parts muted, layer 1 (part 1) configured on channel 16, then on channel 1
+  SynthConfig &c = synth.config();
+  c.listen = SynthListen::Layers;
+  synth.changed();
+  synth.run(gFakeMillis);
+  std::vector<uint8_t> out = rig.dinBytes();
+  CHECK(contains(out, gsBytes(0x40, 0x1F, 0x02, 16)));         // part 15 off
+  CHECK(contains(out, gsBytes(0x40, 0x11, 0x02, 15)));         // part 1 -> channel 16 (config)
+  CHECK(contains(out, {0xCF, 0}));                             // its program on channel 16
+  CHECK(contains(out, {0xBF, 7, 100}));                        // its volume on channel 16
+  CHECK(contains(out, gsBytes(0x40, 0x11, 0x02, 0)));          // then part 1 -> channel 1
+  CHECK(contains(out, gsBytes(0x40, 0x12, 0x02, 16)));         // layer 2 is off: part 2 muted
+  CHECK(contains(out, gsBytes(0x40, 0x10, 0x15, 1)));          // drum layer part is a rhythm part
+  CHECK(contains(out, {0xBF, 99, 0x37, 0xBF, 98, 0x07, 0xBF, 6, 127, 0xBF, 99, 127, 0xBF, 98, 127})); // master
+  CHECK(!contains(out, {0xC0, 0}));                            // nothing on channel 1 except via the part map
+  CHECK(out.size() < 700);
+
+  // One layer edit re-sends only that layer
+  c.layers[0].volume = 80;
+  synth.changed();
+  synth.run(gFakeMillis);
+  out = rig.dinBytes();
+  CHECK(contains(out, {0xBF, 7, 80}) && !contains(out, gsBytes(0x40, 0x1F, 0x02, 16)));
+
+  // Test chord on layer 1: on channel 16, off after 700 ms, part back on channel 1
+  synth.testLayer(0);
+  synth.run(gFakeMillis);
+  out = rig.dinBytes();
+  CHECK(contains(out, {0x9F, 60, 100}) && contains(out, {0x9F, 67, 100}));
+  gFakeMillis += 800;
+  synth.run(gFakeMillis);
+  out = rig.dinBytes();
+  CHECK(contains(out, {0x8F, 60, 0}) && contains(out, gsBytes(0x40, 0x11, 0x02, 0)));
+
+  // A System Reset passing through to DIN OUT: everything is re-applied 100 ms later
+  rig.router.route(msg(MidiSource::Usb, {0xFF}));
+  rig.dinBytes();
+  synth.run(gFakeMillis);
+  CHECK(rig.dinBytes().empty());
+  gFakeMillis += 150;
+  synth.run(gFakeMillis);
+  CHECK(contains(rig.dinBytes(), gsBytes(0x40, 0x1F, 0x02, 16)));
+
+  // All mode: part 15 (channel 16) is muted while a preview plays on the config channel
+  c.listen = SynthListen::All;
+  synth.changed();
+  synth.run(gFakeMillis);
+  rig.dinBytes();
+  synth.preview(0, 0, 81);
+  synth.run(gFakeMillis);
+  out = rig.dinBytes();
+  CHECK(contains(out, gsBytes(0x40, 0x1F, 0x02, 16)) && contains(out, {0xCF, 81}));
+  gFakeMillis += 800;
+  synth.run(gFakeMillis);
+  out = rig.dinBytes();
+  CHECK(contains(out, gsBytes(0x40, 0x1F, 0x02, 15)) && contains(out, gsBytes(0x40, 0x11, 0x02, 0)));
+}
+
 int main()
 {
   testDinParser();
@@ -752,6 +842,7 @@ int main()
   gRunRig = nullptr;
   testRouterReleasesOnChange();
   testLoopProtection();
+  testSamSynth();
   testRouterMigration();
   printf("%d checks, %d failures\n", gChecks, gFailures);
   return gFailures ? 1 : 0;

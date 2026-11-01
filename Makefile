@@ -24,7 +24,7 @@ send:
 
 # Host unit tests (no hardware needed)
 TEST_SOURCES = test/test_main.cpp src/din_midi.cpp src/usb_midi.cpp src/router.cpp \
-	src/midi_outputs.cpp src/note_tracker.cpp src/midi_task.cpp src/clock_engine.cpp src/panic.cpp
+	src/midi_outputs.cpp src/note_tracker.cpp src/midi_task.cpp src/clock_engine.cpp src/panic.cpp src/sam_synth.cpp
 test:
 	mkdir -p build
 	c++ -std=c++17 -Wall -Wno-unused-private-field -Itest/stubs -Isrc $(TEST_SOURCES) -o build/tests

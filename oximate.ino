@@ -37,7 +37,9 @@
 #include "src/panic.h"
 #include "src/router.h"
 #include "src/router_page.h"
+#include "src/sam_synth.h"
 #include "src/spi_bus.h"
+#include "src/synth_page.h"
 #include "src/ui.h"
 #include "src/usb_midi.h"
 
@@ -50,12 +52,14 @@ Router router;           // route() in the MIDI task; settings edited by the UI
 ClockEngine clockEngine; // runs in the MIDI task; settings and transport from the UI
 Panic panic;             // runs in the MIDI task; requested from the UI
 Stats stats;             // written by the MIDI task, read by the Diagnostics page
+SamSynth samSynth;       // runs in the MIDI task; settings from the Synth page
 
 // UI side: Arduino loop() (core 1)
 Leds leds;
 Ui ui;
 Monitor monitor;
 RouterPage routerPage(router, leds, clockEngine);
+SynthPage synthPage(samSynth);
 ClockPage clockPage(clockEngine, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
@@ -73,6 +77,7 @@ void midiTaskLoop(uint32_t nowMillis)
 {
   router.applyPending(); // settings changed on the UI side, even without MIDI traffic
   panic.run(nowMillis);
+  samSynth.run(nowMillis);
   stats.run();
 }
 
@@ -90,6 +95,7 @@ void setup()
   outputs.begin(dinMidi, usbMidi, noteTracker);
   clockEngine.begin(outputs);
   router.begin(outputs, clockEngine);
+  samSynth.begin(outputs);
   ClockSource oldClock;
   if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
     static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
@@ -118,6 +124,7 @@ void setup()
   monitor.begin();
   ui.addPage(monitor);
   ui.addPage(routerPage);
+  ui.addPage(synthPage);
   ui.addPage(clockPage);
   ui.addPage(diagPage);
 
@@ -189,6 +196,7 @@ void loop()
   leds.update();
   router.poll();
   clockEngine.poll();
+  samSynth.poll();
   diagPage.eventsDropped(MidiTask::events().dropped());
   diagPage.loopTime(micros() - loopStart);
   logDinStatus();

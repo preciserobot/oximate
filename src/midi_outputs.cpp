@@ -14,6 +14,15 @@ void MidiOutputs::begin(DinMidi &din, UsbMidi &usb, NoteTracker &tracker)
   _tracker = &tracker;
 }
 
+void MidiOutputs::addListener(Listener listener, void *ctx)
+{
+  if (_listenerCount < kMaxListeners) {
+    _listeners[_listenerCount] = listener;
+    _listenerCtx[_listenerCount] = ctx;
+    _listenerCount++;
+  }
+}
+
 bool MidiOutputs::available(MidiOutput out) const
 {
   return out == MidiOutput::Din || _usb->connected();
@@ -44,6 +53,9 @@ void MidiOutputs::send(MidiOutput out, const MidiMessage &msg, Origin origin)
   _tracker->sent(out, msg, origin);
   _counters.messages[(int)out]++;
   _counters.bytes[(int)out] += msg.length;
+  for (int i = 0; i < _listenerCount; i++) {
+    _listeners[i](out, msg, origin, _listenerCtx[i]);
+  }
 }
 
 bool MidiOutputs::isEcho(const MidiMessage &msg, uint32_t nowMicros)

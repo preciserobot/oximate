@@ -23,7 +23,7 @@ synth.
 | 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | planned (full plan) |
 | 4 | [Push 2 host](#stage-4-push-2-host) | — | planned (full plan) |
 | 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
-| 6 | [Preview synth](#stage-6-preview-synth) | — | planned (full plan) |
+| 6 | [Preview synth](#stage-6-preview-synth) | partly | synth chip control and Synth page done; speaker output to do; needs hardware test |
 | 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Clock → Diag → Monitor.
+  Router → Synth → Clock → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -121,6 +121,7 @@ the USB Host Module.
 |------|---|---|---|
 | Monitor | Clear the log | Pause / resume | Show / hide clock messages |
 | Router | All channels on | LED brightness | Default settings |
+| Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
 | Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
 
@@ -424,6 +425,28 @@ external gear on DIN OUT.
   * the speaker and the microphone can't be used at the same time
   * in speaker mode nothing is sent to DIN OUT for the preview, which also
     avoids the shared-wire problem with external gear
+
+**Implemented so far (2026-11-01):**
+
+* `src/sam_synth.*`: listen modes All / Layers / Off, 4 melodic layers + a
+  drum layer, configured through the config channel; master volume, reverb
+  type and level, chorus level, voices (Full / Lite / Dry); test chords and
+  browser previews; re-sends everything after a reset passes through to DIN
+  OUT, and at boot when the settings differ from the chip's defaults (in All
+  mode with default effects nothing is sent at boot).
+* Synth page (between Router and Clock): tap a cell, A/C −/+ (hold to
+  repeat), B = Browse on an instrument cell, Test on a layer row. Browser:
+  16 GM families, GM / MT-32 bank, the 5 drum kits; tapping a sound previews
+  it, C selects it, A goes back.
+* Shows a warning in Separate wiring that settings reach DIN gear.
+* Message encodings come from the datasheet; there are golden-byte tests in
+  `make test`.
+* **Not built yet:** the built-in speaker output (software synth), per-layer
+  pan and chorus send, MT-32 instrument names, following program changes from
+  your gear on the page, and the Synth page LEDs.
+* Still to check on the hardware (TESTING.md section 6): a part keeps its
+  program after being reassigned, the CM-64 kit number, and the voices
+  setting.
 
 **Full plan:** [docs/stages/stage-6.md](docs/stages/stage-6.md)
 
@@ -746,6 +769,9 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/router.*`      | filtering, remapping, routing; settings saved in NVS |
 | `src/router_page.*` | the Router page |
 | `src/leds.*`        | GO Bottom2 LED bar |
+| `src/sam_synth.*`  | SAM2695 control: part map, layers, effects, auditions, restore after resets |
+| `src/synth_page.*`  | the Synth page and instrument browser |
+| `src/gm_names.h`    | GM instrument names, families, drum kits |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |
 | `src/tap_tempo.h`   | tap tempo averaging |
