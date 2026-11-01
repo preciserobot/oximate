@@ -111,8 +111,8 @@ void setup()
     while (true) delay(1000);
   }
 
-  // Keep the start-up screen up for at least 1.5 s, then the pages take over
-  while (millis() - splashStart < 1500) delay(10);
+  // Keep the start-up screen up for at least 3 s, then the pages take over
+  while (millis() - splashStart < 3000) delay(10);
   ui.begin(clockEngine);
   monitor.begin();
   ui.addPage(monitor);
