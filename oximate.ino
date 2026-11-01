@@ -226,7 +226,7 @@ void handlePanic()
 void logSlowLoop(uint32_t start, uint32_t events, uint32_t input, uint32_t drawn, uint32_t end)
 {
   static uint32_t lastLog = 0;
-  if (end - start < 50000 || millis() - lastLog < 1000) return;
+  if (end - start < 150000 || millis() - lastLog < 1000) return; // a sliced redraw takes ~70 ms
   lastLog = millis();
   Serial.printf("Slow UI loop %lu ms: events %lu, input %lu, draw %lu, rest %lu ms\n",
                 (unsigned long)((end - start) / 1000), (unsigned long)((events - start) / 1000),

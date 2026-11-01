@@ -75,8 +75,13 @@ are built on top; the rest can be checked along the way.
   > Correct behaviour, now labelled "Held at DIN OUT / USB OUT": it counts notes at the outputs.
 
 > Follow-up (2026-11-01): after the bus hand-off fix, please re-check while playing heavily:
-> USB gap max (Diag system view, "USB ... gap max"): ___ ms
-> UI loop max: ___ us
+> USB gap max (Diag system view, "USB ... gap max"): 50 ms
+> UI loop max: ~50000 us
+>
+> Result after off-screen drawing (507993f), 40 s of heavy playing on both inputs, measured
+> over serial: USB gap max 5–6 ms, bus held max 3 ms (content slices), events per loop 0–2 ms,
+> nothing dropped. A full screen redraw takes ~70 ms under load (it yields to USB between
+> slices). **Passed.**
 
 ## 6. Synth page (stage 6)
 
