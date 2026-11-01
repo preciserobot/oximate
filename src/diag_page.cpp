@@ -180,8 +180,13 @@ void DiagPage::drawSystem()
   snprintf(text, sizeof(text), " DIN       rx %lu  tx %lu  drop %lu", (unsigned long)_din.counters().rxBytes,
            (unsigned long)_din.counters().txBytes, (unsigned long)_din.counters().txDropped);
   line(4, text);
-  snprintf(text, sizeof(text), " USB       dropped %lu  bus busy %lu", (unsigned long)_usb.counters().txDropped,
-           (unsigned long)_usb.counters().busBusy);
+  if (_usb.connected()) {
+    snprintf(text, sizeof(text), " USB %04X:%04X drop %lu busy %lu", _usb.vendorId(), _usb.productId(),
+             (unsigned long)_usb.counters().txDropped, (unsigned long)_usb.counters().busBusy);
+  } else {
+    snprintf(text, sizeof(text), " USB --  drop %lu  busy %lu", (unsigned long)_usb.counters().txDropped,
+             (unsigned long)_usb.counters().busBusy);
+  }
   line(5, text);
   snprintf(text, sizeof(text), " UI drop %lu  loop echoes %lu", (unsigned long)_eventsDropped,
            (unsigned long)_outputs.counters().echoesBlocked);

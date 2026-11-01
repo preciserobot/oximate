@@ -102,6 +102,10 @@ the USB Host Module.
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
   Router → Clock → Diag → Monitor.
+* **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
+  source, tempo and transport, and on the right the battery level (green
+  above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
+  The USB device's VID:PID is on the Diag page's system view.
 * **Touch buttons A/B/C** (the three circles below the screen) belong to the
   current page; the bottom bar shows their labels. Holding a button for about
   0.5 s is a separate action on some pages.

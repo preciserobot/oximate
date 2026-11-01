@@ -16,7 +16,8 @@ void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t on
   M5.Display.drawString(text, x + w / 2, y + h / 2);
   M5.Display.setTextDatum(top_left);
 }
-static constexpr uint32_t kHeaderMillis = 500; // BPM readout changes without other events
+static constexpr uint32_t kHeaderMillis = 500;   // BPM readout changes without other events
+static constexpr uint32_t kBatteryMillis = 5000; // battery level is read this often
 
 void Ui::splash(const char *status)
 {
@@ -163,12 +164,7 @@ void Ui::poll()
 
 void Ui::drawHeader()
 {
-  char usb[16];
-  if (_usbConnected) {
-    snprintf(usb, sizeof(usb), "USB %04X:%04X", _usbVid, _usbPid);
-  } else {
-    strcpy(usb, "USB --");
-  }
+  const char *usb = _usbConnected ? "USB ok" : "USB --"; // VID:PID is on the Diag page
 
   static const char *const kModes[] = {"INT", "USB", "DIN"};
   ClockEngine::Snapshot clock = _clock->snapshot();
@@ -184,20 +180,58 @@ void Ui::drawHeader()
   char title[10];
   snprintf(title, sizeof(title), "%s>", _pages[_current]->title());
 
+  // Battery: read over I2C every few seconds only
+  uint32_t now = millis();
+  if (!_batteryReadAt || now - _batteryReadAt >= kBatteryMillis) {
+    _batteryReadAt = now;
+    _batteryLevel = M5.Power.getBatteryLevel();
+    _charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
+  }
+
+  // Columns: title 0-7, USB 9-14, clock 16-29; battery on the right
   char text[48];
-  snprintf(text, sizeof(text), "%-8s%-15s %s", title, usb, clockText);
+  snprintf(text, sizeof(text), "%-8s %-6s %s", title, usb, clockText);
   DisplayLock lock;
   M5.Display.fillRect(0, 0, M5.Display.width(), kHeaderHeight, kBarColor);
   M5.Display.setTextColor(TFT_WHITE, kBarColor);
   M5.Display.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
   M5.Display.print(text);
+  drawBattery();
   if (_flashUntil) {
-    const int x = 24 * kCharWidth; // where the clock text starts
+    const int x = 16 * kCharWidth; // where the clock text starts
     M5.Display.fillRect(x, 0, M5.Display.width() - x, kHeaderHeight, _flashColor);
     M5.Display.setTextColor(TFT_WHITE, _flashColor);
     M5.Display.setCursor(x + 4, (kHeaderHeight - kCharHeight) / 2);
     M5.Display.print(_flashText);
   }
+}
+
+/*! Small battery symbol plus percentage at the right end of the header (caller holds the lock) */
+void Ui::drawBattery()
+{
+  const int textX = M5.Display.width() - 4 * kCharWidth - 2; // "100%"
+  const int iconX = textX - 24, iconY = 5, iconW = 18, iconH = 10;
+  uint16_t color = _charging ? TFT_CYAN
+                   : _batteryLevel < 0 ? TFT_LIGHTGREY
+                   : _batteryLevel < 20 ? TFT_RED
+                   : _batteryLevel <= 50 ? TFT_YELLOW
+                                         : TFT_GREEN;
+  M5.Display.drawRect(iconX, iconY, iconW, iconH, color);
+  M5.Display.fillRect(iconX + iconW, iconY + 3, 2, iconH - 6, color); // terminal
+  if (_batteryLevel > 0) {
+    int fill = (iconW - 4) * (_batteryLevel > 100 ? 100 : _batteryLevel) / 100;
+    M5.Display.fillRect(iconX + 2, iconY + 2, fill < 1 ? 1 : fill, iconH - 4, color);
+  }
+  char percent[6];
+  if (_batteryLevel < 0) {
+    strcpy(percent, " --");
+  } else {
+    snprintf(percent, sizeof(percent), _charging ? "+%d" : "%3d", (int)_batteryLevel);
+  }
+  if (!_charging) strcat(percent, "%");
+  M5.Display.setTextColor(color, kBarColor);
+  M5.Display.setCursor(textX, (kHeaderHeight - kCharHeight) / 2);
+  M5.Display.print(percent);
 }
 
 void Ui::drawFooter()

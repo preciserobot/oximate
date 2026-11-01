@@ -82,6 +82,7 @@ private:
   void show(int index);
   void drawHeader();
   void drawFooter();
+  void drawBattery();
 
   const ClockEngine *_clock = nullptr;
   Page *_pages[kMaxPages] = {nullptr};
@@ -90,6 +91,10 @@ private:
 
   bool _usbConnected = false;
   uint16_t _usbVid = 0, _usbPid = 0;
+
+  int32_t _batteryLevel = -1; // percent, -1 = unknown
+  bool _charging = false;
+  uint32_t _batteryReadAt = 0;
 
   char _flashText[20] = "";
   uint16_t _flashColor = TFT_WHITE;
