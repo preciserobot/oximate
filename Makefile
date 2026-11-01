@@ -1,5 +1,5 @@
 # Created By: zapTheGoose
-.PHONY: all build send test
+.PHONY: all build send test log
 
 PORT ?= /dev/cu.usbserial-58620052741
 
@@ -29,3 +29,8 @@ test:
 	mkdir -p build
 	c++ -std=c++17 -Wall -Wno-unused-private-field -Itest/stubs -Isrc $(TEST_SOURCES) -o build/tests
 	./build/tests
+
+# Reset the board and show its serial output for SECONDS (default 10)
+SECONDS ?= 10
+log:
+	python3 -I tools/serial_log.py $(PORT) $(SECONDS)

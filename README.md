@@ -568,6 +568,7 @@ Requires `arduino-cli` with the `esp32:esp32` core, plus the **M5Unified** and
 make build                               # fetches + patches USB Host Shield 2.0 on first run
 make send PORT=/dev/cu.usbserial-XXXX    # upload
 make                                     # build + send
+make log SECONDS=20                      # reset the board and show its serial output
 ```
 
 ### Unit tests
