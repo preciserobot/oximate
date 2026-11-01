@@ -38,7 +38,7 @@ synth.
 | 18 | [Network MIDI](#stage-18-network-midi) | — | planned (full plan) |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | planned (full plan) |
 | 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | idea |
-| 21 | [Chord detector](#stage-21-chord-detector) | — | planned (full plan) |
+| 21 | [Chord detector](#stage-21-chord-detector) | ✅ | needs hardware test |
 | 22 | [Phrase tracker](#stage-22-phrase-tracker) | — | planned (full plan) |
 
 Details for each stage are in [Stages](#stages).
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Drums → Clock → Analyse → Ear → Diag → Monitor.
+  Router → Synth → Drums → Clock → Analyse → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -127,6 +127,7 @@ the USB Host Module.
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
+| Chord | Clear history and held notes (hold: freeze / unfreeze) | Full / simple (big chord) view | Sharps / flats |
 | Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
 
 ## Architecture
@@ -839,6 +840,28 @@ the Oxi One, the M8 or an Elektron sequencer.
 * **Defaults (decided):** sharps; channel 10 (drums) excluded. Once stage 3
   runs, the chord name also appears on the Oxi One's screen.
 
+**Implemented (2026-11-01)**, with these differences from the plan:
+
+* `music_theory` gained a second chord table for lead-sheet names (37 types:
+  power, triads, sus, 6ths, 7ths, added tones, 9ths, 11ths, 13ths, 7b5,
+  7b9, 7#9, 7#11, 7b13, 13b9) beside stage 7's exact-match table, which is
+  unchanged. The ear page's explorer still uses the stage 7 matcher.
+* Scoring weights as planned, except: a missing required tone costs −25
+  (plan: −12), so a name that claims an unplayed 7th loses against a plain
+  chord with one extra note (`C/F#`, not `C7#11/F#`); and 6 / m6 chords need
+  their 5th (otherwise `Eb6` swallows `Cm/Eb`).
+* Equivalent spellings are named after the bass: Eb G Bb C over Eb is `Eb6`,
+  over C it's `Cm7`. Only roots that are played are considered (no rootless
+  voicings). `7alt` isn't in the table.
+* Two pitch classes show as an interval (`C+E`, "M3") unless they form a
+  power chord (`C5`).
+* Detection runs on the UI thread on every loop, also while the page is
+  hidden, so the history and key estimate keep up. `ChordDetector::
+  stableName()` returns the current stable chord name: stage 3 will show it
+  on the Oxi One's screen.
+* Held notes are also cleared after a completed panic and with A on the
+  page (manual unstick).
+
 **Full plan:** [docs/stages/stage-21.md](docs/stages/stage-21.md)
 
 ### Stage 22: Phrase tracker
@@ -926,9 +949,12 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/drum_page.*`   | the Drums page (Grid, Sound and Pattern views) |
 | `src/drum_kits.h`   | GM percussion note names |
 | `src/gm_names.h`    | GM instrument names, families, drum kits |
-| `src/music_theory.*` | note names, intervals, chords, scales, chord matching (stages 7 and 21) |
+| `src/music_theory.*` | note names, intervals, chords, scales; exact matching (stage 7), scored extended-chord matching and key estimate (stage 21) |
 | `src/ear_trainer.*` | ear-trainer logic: questions, answers, levels, statistics |
 | `src/ear_page.*`    | the Ear page (trainer and chord explorer) |
+| `src/chord_input.*` | stage 21: notes held at the inputs (input observer in the MIDI task) |
+| `src/chord_detector.*` | stage 21: settle, name, alternatives, history, key estimate (UI side) |
+| `src/chord_page.*`  | the Chord page |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |

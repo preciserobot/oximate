@@ -25,6 +25,9 @@
 #include <M5Unified.h>
 
 #include "src/analyser_page.h"
+#include "src/chord_detector.h"
+#include "src/chord_input.h"
+#include "src/chord_page.h"
 #include "src/clock_analyser.h"
 #include "src/clock_engine.h"
 #include "src/clock_page.h"
@@ -72,6 +75,9 @@ SynthPage synthPage(samSynth, speakerSynth);
 DrumPage drumPage(drumMachine, clockEngine, leds);
 ClockPage clockPage(clockEngine, leds);
 EarPage earPage(samSynth, speakerSynth, leds); // stage 7: ear trainer + chord explorer
+ChordInput chordInput;       // stage 21: held input notes, kept by an observer in the MIDI task
+ChordDetector chordDetector; // stage 21: names them (UI side); stableName() is the hook for stage 3
+ChordPage chordPage(chordInput, chordDetector, clockEngine, leds);
 ClockAnalyser clockAnalyser; // stage 9: fed by an input observer in the MIDI task
 AnalyserPage analyserPage(clockAnalyser, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
@@ -94,6 +100,7 @@ void midiTaskLoop(uint32_t nowMillis)
   panic.run(nowMillis);
   samSynth.run(nowMillis);
   drumMachine.run(nowMillis);
+  chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
 }
 
@@ -149,9 +156,12 @@ void setup()
   ui.addPage(analyserPage);
   earPage.begin();
   ui.addPage(earPage);
+  chordPage.begin();
+  ui.addPage(chordPage);
   ui.addPage(diagPage);
 
   InputHooks::addObserver(ClockAnalyser::observer, &clockAnalyser);
+  InputHooks::addObserver(ChordInput::observer, &chordInput);
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
   MidiTask::start(usbMidi, dinMidi, clockEngine, outputs);
@@ -279,6 +289,8 @@ void loop()
   clockEngine.poll();
   samSynth.poll();
   earPage.poll();
+  chordDetector.update(chordInput.snapshot(), millis()); // also off-page, so the history keeps up
+  chordPage.poll();
   drumMachine.poll();
   // Drum hits also play on the built-in speaker when the Synth page's output is the speaker
   uint8_t drumNote, drumVelocity;

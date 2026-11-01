@@ -164,6 +164,24 @@ background; A resets them.
 * [ ] LEDs while the page is open: right side = USB, left side = DIN, coloured by status, pulsing every beat
 * [ ] Hold C: CSV lines (`input,tick,time_us,interval_us,batched`) appear in `make log`; hold C again stops them and the normal log returns
 
+## 10. Chord detector (stage 21)
+
+- [ ] The Chord page appears after Ear
+- [ ] Triads and sevenths from a keyboard are named (C, Cm, Cmaj7, C7, Cm7, Cdim, Caug, Cm7b5)
+- [ ] Inversions: C/E shows "1st inversion"; a bass note outside the chord shows as a slash (C/F#)
+- [ ] Extended chords: C9, Cm9, C13, C7b9, Cadd9, C6/9 are named; the alternatives line shows close readings (e.g. C6 / Am7/C)
+- [ ] A rolled or strummed chord doesn't flash partial names
+- [ ] Two notes show the interval (or C5 for a fifth)
+- [ ] Notes are listed lowest first in their pitch-class colours; the LEDs show the chord tones in the same colours, LED 9 green/yellow/red
+- [ ] History shows the last 4 chords; after a few chords the key estimate makes sense
+- [ ] Hold A freezes the name (cyan); hold A again releases; A clears history
+- [ ] B switches to the big simple view; C switches sharps/flats
+- [ ] Chips: USB only / DIN only, a single channel, drums (ch 10) ignored by default
+- [ ] Arpeggio window: an arpeggiated chord from the Oxi or M8 is named as one chord (Arp 500 / Arp bar)
+- [ ] Sustain on: notes held by the pedal count
+- [ ] Unplugging the USB keyboard while holding notes clears them; a panic clears them
+- [ ] Settings survive a power cycle
+
 ## Other notes
 
 >
