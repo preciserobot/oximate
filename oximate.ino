@@ -81,13 +81,8 @@ void setup()
   M5.begin();
   Serial.begin(115200);
   SpiBus::begin();
-
-  ui.begin(clockEngine);
-  monitor.begin();
-  ui.addPage(monitor);
-  ui.addPage(routerPage);
-  ui.addPage(clockPage);
-  ui.addPage(diagPage);
+  uint32_t splashStart = millis();
+  Ui::splash("starting");
 
   // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2)
   dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
@@ -104,6 +99,7 @@ void setup()
   leds.begin();
   leds.setLevel(router.config().ledLevel);
 
+  Ui::splash("USB host");
   bool usbOk;
   {
     SpiLock bus;
@@ -111,12 +107,18 @@ void setup()
   }
   if (!usbOk) {
     Serial.println("USB host init failed");
-    DisplayLock lock;
-    M5.Display.setTextColor(TFT_RED, TFT_BLACK);
-    M5.Display.drawString("USB host init failed", 0, 40);
-    M5.Display.drawString("Check module + DIP switches", 0, 60);
+    Ui::splash("USB host failed: check DIP switches");
     while (true) delay(1000);
   }
+
+  // Keep the start-up screen up for at least 1.5 s, then the pages take over
+  while (millis() - splashStart < 1500) delay(10);
+  ui.begin(clockEngine);
+  monitor.begin();
+  ui.addPage(monitor);
+  ui.addPage(routerPage);
+  ui.addPage(clockPage);
+  ui.addPage(diagPage);
 
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);

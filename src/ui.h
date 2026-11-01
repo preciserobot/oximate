@@ -68,6 +68,8 @@ class Ui
 public:
   static constexpr int kMaxPages = 8;
 
+  /*! Start-up screen: red box with the name, plus a status line (call before begin()) */
+  static void splash(const char *status);
   void begin(const ClockEngine &clock);
   void addPage(Page &page);
   void poll();                ///< handle buttons and touch, redraw what changed

@@ -17,6 +17,31 @@ void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t on
 }
 static constexpr uint32_t kHeaderMillis = 500; // BPM readout changes without other events
 
+void Ui::splash(const char *status)
+{
+  DisplayLock lock;
+  static bool drawn = false;
+  int w = M5.Display.width(), h = M5.Display.height();
+  if (!drawn) { // the box once; later calls only update the status line
+    drawn = true;
+    M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.fillRoundRect(30, 70, w - 60, 80, 10, TFT_RED);
+    M5.Display.setFont(&fonts::FreeSansBold24pt7b);
+    M5.Display.setTextColor(TFT_WHITE);
+    M5.Display.setTextDatum(middle_center);
+    M5.Display.drawString("OxiMate", w / 2, 108);
+    M5.Display.setFont(&fonts::AsciiFont8x16);
+    M5.Display.setTextColor(TFT_LIGHTGREY);
+    M5.Display.drawString("MIDI toolbox", w / 2, 172);
+  }
+  M5.Display.setFont(&fonts::AsciiFont8x16);
+  M5.Display.fillRect(0, h - 30, w, 20, TFT_BLACK);
+  M5.Display.setTextColor(TFT_DARKGREY);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.drawString(status, w / 2, h - 20);
+  M5.Display.setTextDatum(top_left);
+}
+
 void Ui::begin(const ClockEngine &clock)
 {
   _clock = &clock;
