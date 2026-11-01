@@ -11,6 +11,7 @@
 > **Decided 2026-11-01:**
 >
 > * Oxi One **MK1**: use model byte `00`. Check the firmware version in M0.
+> * The Oxi's screen also shows the current chord from stage 21's chord detector (a small text API on `OxiRemote`).
 > * M8 **Model:02** over **TRS type A** from OxiMate's MIDI OUT (check the Unit MIDI's TRS type). The control channel is still to be read off the M8.
 
 ## Goal

@@ -3,6 +3,16 @@
 > **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 > Shares `src/music_theory.*` with stage 7: whichever of the two is built first creates it.
+>
+> **Decided 2026-11-01:**
+>
+> * Note names use **sharps** by default (C toggles flats).
+> * **Channel 10 (drums) is excluded** from detection by default.
+> * The full page (4-chord history, key estimate) is the default; **B toggles
+>   a simple view** that shows only the current chord, large. Freezing the
+>   display moves to holding A.
+> * The chord name is **also shown on the Oxi One's screen** once stage 3's
+>   remote mode is running (see "Chord on the Oxi screen").
 
 A page that names the chord currently being played into OxiMate, from a USB
 keyboard, the Oxi One, the M8 or an Elektron sequencer.
@@ -81,8 +91,8 @@ chords arrive over tens of milliseconds.
   arpeggio into "C" instead of single notes. Implemented in the task as a
   per-note release timestamp (`uint32_t lastOff[128]`, 512 bytes), pruned in
   the task loop hook.
-* **Hold**: button B freezes the last named chord until pressed again, so a
-  short chord can be read after it ends.
+* **Freeze**: holding A freezes the last named chord until A is held again,
+  so a short chord can be read after it ends.
 
 ## Detection algorithm (`src/music_theory.*`)
 
@@ -161,13 +171,28 @@ an AND and two popcounts. Well under a millisecond on the UI core.
 │ ────────────────────────────────────── │
 │ Am7   Dm7   G7    Cmaj7/E              │  history: last 4 chords
 │ Key    C major (approx.)               │  optional key estimate
-│ In USB+DIN all ch   Arp off   Sus off  │  settings chips (tap)
-│   Clear        Hold        Notes:#     │  touch buttons A / B / C
+│ In USB+DIN ch-10    Arp off   Sus off  │  settings chips (tap)
+│   Clear      View:full     Notes:#     │  touch buttons A / B / C
+└────────────────────────────────────────┘
+```
+
+Simple view (B):
+
+```
+┌────────────────────────────────────────┐
+│Chord>   USB 1C75:0288   INT 120.0 PLAY │
+│                                        │
+│                                        │
+│              Cmaj7/E                   │  current chord only, as large
+│                                        │  as fits (FreeSansBold24 at 2x)
+│                                        │
+│                                        │
+│   Clear     View:simple    Notes:#     │
 └────────────────────────────────────────┘
 ```
 
 * **Big name:** grey while the set is settling, white when stable, cyan
-  while held (B). When the notes match nothing well: the note names with a
+  while frozen (hold A). When the notes match nothing well: the note names with a
   `?`.
 * **Notes:** played notes, lowest first, colour-coded by pitch class
   (`noteColor()`), so they match the LEDs.
@@ -176,12 +201,14 @@ an AND and two popcounts. Well under a millisecond on the UI core.
   stable for 150 ms), handy for reading a sequencer's progression.
 * **Settings chips** (bottom row, tap to cycle):
   * input: `USB+DIN`, `USB`, `DIN`
-  * channel: `all ch`, `ch 1` … `ch 16`
+  * channel: `ch-10` (all except drums, the default), `all ch`, `ch 1` …
+    `ch 16`
   * arpeggio window: `Arp off`, `250`, `500`, `1000`, `1 bar`
   * sustain pedal: `Sus off` / `Sus on`
-* Buttons: **A** clears the history (and the held set, as a manual unstick),
-  **B** holds or releases the display, **C** toggles sharps/flats
-  (`Notes:#` / `Notes:b`).
+* Buttons: **A** clears the history (and the held set, as a manual unstick);
+  holding A freezes or releases the display. **B** switches between the full
+  and the simple view (`View:full` / `View:simple`). **C** toggles
+  sharps/flats (`Notes:#` / `Notes:b`).
 * Redraws only when the snapshot version or the chord changes, at most
   every 50 ms; the name and notes rows are redrawn without clearing the page
   (no flicker), like the Clock page digits.
@@ -208,10 +235,12 @@ struct ChordConfig {
   uint8_t version = kVersion;
   uint8_t inputs = 3;      // bit 0 USB, bit 1 DIN
   uint8_t channel = 0;     // 0 = all, 1-16
+  bool skipDrums = true;   // with channel 0: ignore channel 10
   uint16_t arpMillis = 0;  // 0 = off, 0xFFFF = 1 bar
   bool sustain = false;
   bool flats = false;
   bool keyEstimate = true;
+  bool simpleView = false; // B: only the current chord, large
 };
 ```
 
@@ -273,6 +302,21 @@ Memory: ~1.7 KB task state, tables in flash, page state < 1 KB.
 * Sustain pedal on and off.
 * Unplug the keyboard while holding a chord: the display clears.
 
+## Chord on the Oxi screen
+
+Once stage 3 drives the Oxi One in remote mode, the current chord name is
+also written to the Oxi's OLED:
+
+* Stage 3's `OxiRemote` gets a small text API (e.g. `setStatusText(line,
+  text)`), and the Chord page (or a background hook, so it works on any
+  page) calls it when the stable chord changes, at most a few times per
+  second.
+* The chord shares the screen with stage 3's own display; the exact line and
+  font follow the Oxi remote protocol's display commands (stage 3, M0
+  verifies them).
+* Works only while the Oxi is the USB device in remote mode; with the Oxi on
+  DIN there is no screen access.
+
 ## Risks and open questions
 
 * **Naming conventions differ** (`C6` vs `Am7/C`, `Cm7b5` vs `Cø`). The
@@ -281,12 +325,6 @@ Memory: ~1.7 KB task state, tables in flash, page state < 1 KB.
 * **Arpeggio window vs. melody:** with a long window, melodic notes over a
   chord get folded into it. "Off" is the default for that reason.
 * **Many inputs at once** (drums on channel 10 from the Elektron while
-  playing chords) pollute the set. The channel filter handles it; the
-  default could exclude channel 10 if you prefer.
-* Open questions for you:
-  1. Sharps or flats by default?
-  2. Should channel 10 (drums) be excluded by default?
-  3. Is the 4-chord history and the key estimate wanted, or keep the page
-     minimal?
-  4. Should the chord name also be sent out as anything (e.g. shown on the
-     Oxi's screen in stage 3), or is the Core2 screen enough?
+  playing chords) pollute the set. Channel 10 is excluded by default, and the
+  channel filter handles the rest.
+* The user's answers (2026-11-01) are in the status note at the top.

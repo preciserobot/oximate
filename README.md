@@ -631,9 +631,12 @@ the Oxi One, the M8 or an Elektron sequencer.
   optional arpeggio window (250/500/1000 ms or 1 bar) that collects
   arpeggiated notes into one chord.
 * **Page:** big chord name and inversion, the notes coloured by pitch class,
-  up to 2 alternatives, the last 4 chords, and the key estimate. A clear,
-  B hold display, C sharps/flats. The LEDs show the chord tones in their
+  up to 2 alternatives, the last 4 chords, and the key estimate. **B**
+  switches to a simple view with only the current chord, large. A clears
+  (hold A: freeze), C sharps/flats. The LEDs show the chord tones in their
   pitch-class colours while the page is open.
+* **Defaults (decided):** sharps; channel 10 (drums) excluded. Once stage 3
+  runs, the chord name also appears on the Oxi One's screen.
 
 **Full plan:** [docs/stages/stage-21.md](docs/stages/stage-21.md)
 
