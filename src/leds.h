@@ -4,8 +4,9 @@
 #include "midi_message.h"
 
 /*! The 10 RGB LEDs (SK6812, GPIO25) of the M5GO Bottom2, as two strips of 5.
- *  Default use is input activity: LEDs 0-4 flash for USB, 5-9 for DIN.
- *  Later modes (sequencers, clock) take the LEDs over via setPixel(). */
+ *  Unclaimed LEDs show input activity: LEDs 0-4 flash for USB, 5-9 for DIN.
+ *  A mode claims a range of LEDs and sets them with setPixel() until it releases them
+ *  (README "Shared infrastructure": LED claims). UI thread only. */
 class Leds
 {
 public:
@@ -17,6 +18,10 @@ public:
   void activity(const MidiMessage &msg);
   void update(); ///< call every loop; renders at most ~60 fps
 
+  void claim(uint8_t owner, int first, int count); ///< owner: stage number (non-zero)
+  void release(uint8_t owner);
+  void setPixel(uint8_t owner, int index, RGBColor color); ///< ignored unless owner holds the LED
+
 private:
   struct Flash
   {
@@ -25,6 +30,8 @@ private:
   };
 
   Flash _flash[2]; // indexed by MidiSource
+  uint8_t _owner[kCount] = {0};
+  RGBColor _pixel[kCount];
   uint32_t _lastFrame = 0;
   bool _lit = false;
 };

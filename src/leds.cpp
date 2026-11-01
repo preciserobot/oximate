@@ -67,6 +67,30 @@ void Leds::activity(const MidiMessage &msg)
   }
 }
 
+void Leds::claim(uint8_t owner, int first, int count)
+{
+  for (int i = first; i < first + count && i < kCount; i++) {
+    _owner[i] = owner;
+    _pixel[i] = RGBColor(0, 0, 0);
+  }
+  _lit = true;
+}
+
+void Leds::release(uint8_t owner)
+{
+  for (int i = 0; i < kCount; i++) {
+    if (_owner[i] == owner) _owner[i] = 0;
+  }
+  _lit = true;
+}
+
+void Leds::setPixel(uint8_t owner, int index, RGBColor color)
+{
+  if (index >= 0 && index < kCount && _owner[index] == owner) {
+    _pixel[index] = color;
+  }
+}
+
 void Leds::update()
 {
   uint32_t now = millis();
@@ -76,12 +100,19 @@ void Leds::update()
   _lastFrame = now;
 
   bool any = false;
+  bool claimed = false;
   for (int side = 0; side < 2; side++) {
     Flash &flash = _flash[side];
     RGBColor c(flash.color.R8() * flash.intensity, flash.color.G8() * flash.intensity,
                    flash.color.B8() * flash.intensity);
     for (int i = 0; i < kPerSide; i++) {
-      M5.Led.setColor(side * kPerSide + i, c);
+      int index = side * kPerSide + i;
+      if (_owner[index]) {
+        M5.Led.setColor(index, _pixel[index]);
+        claimed = true;
+      } else {
+        M5.Led.setColor(index, c);
+      }
     }
     if (flash.intensity > 0.01f) {
       flash.intensity *= kDecayPerFrame;
@@ -90,9 +121,9 @@ void Leds::update()
       flash.intensity = 0;
     }
   }
-  // Keep pushing frames while fading, plus one final frame to turn everything off
-  if (any || _lit) {
+  // Keep pushing frames while fading or while a mode owns LEDs, plus one final frame to turn off
+  if (any || claimed || _lit) {
     M5.Led.display();
   }
-  _lit = any;
+  _lit = any || claimed;
 }

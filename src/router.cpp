@@ -3,15 +3,29 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+#include "clock_engine.h"
 #include "midi_outputs.h"
 
 static constexpr uint32_t kSaveDelayMillis = 2000; // batch rapid taps into one flash write
 static const char *const kNamespace = "oximate";
 static const char *const kKey = "router";
 
-void Router::begin(MidiOutputs &outputs)
+/*! Layout of version 1 settings, for migration */
+struct RouterConfigV1
+{
+  uint8_t version;
+  bool usbToDin, dinToDin, dinToUsb;
+  uint16_t channelMask[2];
+  uint8_t forceChannel[2];
+  ClockSource clock;
+  bool sysex;
+  uint8_t ledLevel;
+};
+
+void Router::begin(MidiOutputs &outputs, ClockEngine &clock)
 {
   _outputs = &outputs;
+  _clock = &clock;
   load();
   apply();
 }
@@ -31,17 +45,6 @@ bool Router::passes(const RouterConfig &config, const MidiMessage &msg)
   switch (msg.status()) {
     case 0xF0:
       return config.sysex;
-    case 0xF2: // song position
-    case 0xF8: // clock
-    case 0xFA: // start
-    case 0xFB: // continue
-    case 0xFC: // stop
-      switch (config.clock) {
-        case ClockSource::Both: return true;
-        case ClockSource::Usb:  return msg.source == MidiSource::Usb;
-        case ClockSource::Din:  return msg.source == MidiSource::Din;
-        default:                return false;
-      }
     default:
       return true;
   }
@@ -53,6 +56,16 @@ bool Router::route(const MidiMessage &msg)
   {
     CriticalGuard guard(_lock);
     config = _active;
+  }
+  switch (msg.status()) {
+    case 0xF2: // song position
+    case 0xF8: // clock
+    case 0xFA: // start
+    case 0xFB: // continue
+    case 0xFC: // stop
+      // The clock engine is the only sender of clock and transport; it uses them if it
+      // follows this input
+      return _clock->onExternal(msg);
   }
   if (!passes(config, msg)) {
     return false;
@@ -92,6 +105,12 @@ bool Router::route(const MidiMessage &msg)
   return sent;
 }
 
+bool Router::migratedClock(ClockSource &clock) const
+{
+  clock = _migratedClock;
+  return _migrated;
+}
+
 void Router::changed()
 {
   apply();
@@ -120,10 +139,22 @@ void Router::load()
     return; // nothing saved yet
   }
   RouterConfig stored;
-  if (prefs.getBytesLength(kKey) == sizeof(stored) &&
-      prefs.getBytes(kKey, &stored, sizeof(stored)) == sizeof(stored) &&
+  RouterConfigV1 old;
+  size_t length = prefs.getBytesLength(kKey);
+  if (length == sizeof(stored) && prefs.getBytes(kKey, &stored, sizeof(stored)) == sizeof(stored) &&
       stored.version == RouterConfig::kVersion) {
     _edit = stored;
+  } else if (length == sizeof(old) && prefs.getBytes(kKey, &old, sizeof(old)) == sizeof(old) && old.version == 1) {
+    _edit.usbToDin = old.usbToDin;
+    _edit.dinToDin = old.dinToDin;
+    _edit.dinToUsb = old.dinToUsb;
+    memcpy(_edit.channelMask, old.channelMask, sizeof(old.channelMask));
+    memcpy(_edit.forceChannel, old.forceChannel, sizeof(old.forceChannel));
+    _edit.sysex = old.sysex;
+    _edit.ledLevel = old.ledLevel;
+    _migrated = true;
+    _migratedClock = old.clock;
+    _dirty = true; // rewrite in the new layout
   }
   prefs.end();
 }

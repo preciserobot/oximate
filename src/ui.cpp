@@ -3,9 +3,19 @@
 using namespace Layout;
 
 static constexpr uint32_t kFrameMillis = 40;
+
+void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t onColor)
+{
+  M5.Display.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 4, on ? onColor : kOffColor);
+  uint16_t textColor = on ? (onColor == kOnColor ? TFT_WHITE : TFT_BLACK) : kOffTextColor;
+  M5.Display.setTextColor(textColor);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.drawString(text, x + w / 2, y + h / 2);
+  M5.Display.setTextDatum(top_left);
+}
 static constexpr uint32_t kHeaderMillis = 500; // BPM readout changes without other events
 
-void Ui::begin(const ClockTracker &clock)
+void Ui::begin(const ClockEngine &clock)
 {
   _clock = &clock;
   DisplayLock lock;
@@ -23,6 +33,7 @@ void Ui::addPage(Page &page)
 
 void Ui::show(int index)
 {
+  _pages[_current]->leave();
   _current = index;
   {
     DisplayLock lock;
@@ -49,9 +60,17 @@ void Ui::poll()
   }
   Page &page = *_pages[_current];
 
-  if (M5.BtnA.wasClicked()) { page.onButton(0); _footerDirty = true; }
-  if (M5.BtnB.wasClicked()) { page.onButton(1); _footerDirty = true; }
-  if (M5.BtnC.wasClicked()) { page.onButton(2); _footerDirty = true; }
+  m5::Button_Class *buttons[3] = {&M5.BtnA, &M5.BtnB, &M5.BtnC};
+  for (int i = 0; i < 3; i++) {
+    if (buttons[i]->wasClicked()) {
+      page.onButton(i);
+      _footerDirty = true;
+    } else if (buttons[i]->wasHold()) {
+      page.onButtonHold(i);
+      _footerDirty = true;
+    }
+  }
+  page.tick();
 
   auto touch = M5.Touch.getDetail();
   if (touch.wasClicked() && touch.y < kFooterTop) {
@@ -98,11 +117,14 @@ void Ui::drawHeader()
     strcpy(usb, "USB --");
   }
 
-  char clock[20] = "";
-  MidiSource source;
-  if (const ClockTracker::State *state = _clock->latest(source)) {
-    snprintf(clock, sizeof(clock), "%s %5.1f %s", source == MidiSource::Usb ? "USB" : "DIN", state->bpm,
-             state->running ? "PLAY" : "STOP");
+  static const char *const kModes[] = {"INT", "USB", "DIN"};
+  ClockEngine::Snapshot clock = _clock->snapshot();
+  char clockText[20];
+  if (clock.mode != ClockMode::Internal && (clock.lost || clock.bpm <= 0)) {
+    snprintf(clockText, sizeof(clockText), "%s --.- %s", kModes[(int)clock.mode], clock.lost ? "LOST" : "WAIT");
+  } else {
+    snprintf(clockText, sizeof(clockText), "%s %5.1f %s", kModes[(int)clock.mode], clock.bpm,
+             clock.running ? "PLAY" : "STOP");
   }
 
   // The ">" hints that tapping the header switches to the next page
@@ -110,7 +132,7 @@ void Ui::drawHeader()
   snprintf(title, sizeof(title), "%s>", _pages[_current]->title());
 
   char text[48];
-  snprintf(text, sizeof(text), "%-8s%-15s %s", title, usb, clock);
+  snprintf(text, sizeof(text), "%-8s%-15s %s", title, usb, clockText);
   DisplayLock lock;
   M5.Display.fillRect(0, 0, M5.Display.width(), kHeaderHeight, kBarColor);
   M5.Display.setTextColor(TFT_WHITE, kBarColor);

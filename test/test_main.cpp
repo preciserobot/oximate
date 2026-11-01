@@ -1,23 +1,29 @@
 // Host unit tests for the hardware-independent parts of OxiMate.
 // Build and run with `make test` (uses the stubs in test/stubs).
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <vector>
 
-#include <usbh_midi.h> // fake device: records sends in gUsbSent
+#include <Preferences.h> // fake NVS: gFakeNvs
+#include <usbh_midi.h>   // fake device: records sends in gUsbSent
 
 #define private public // white-box access to parsers and internal state
+#include "clock_engine.h"
 #include "din_midi.h"
 #include "midi_outputs.h"
 #include "midi_task.h"
 #include "note_tracker.h"
 #include "router.h"
+#include "tap_tempo.h"
 #include "usb_midi.h"
 #undef private
+#include "platform_time.h"
 
 uint32_t gFakeMillis = 0;
 uint32_t gFakeMicros = 0;
+uint64_t gFakeMicros64 = 0;
 
 static int gFailures = 0;
 static int gChecks = 0;
@@ -206,14 +212,18 @@ struct OutputRig
   UsbMidi usb;
   NoteTracker tracker;
   MidiOutputs outputs;
+  ClockEngine clock;
   Router router;
 
   OutputRig()
   {
+    gFakeNvs.clear();
+    gFakeMicros64 = 0;
     din.begin(serial, 0, 0, record);
     usb.begin(record);
     outputs.begin(din, usb, tracker);
-    router.begin(outputs);
+    clock.begin(outputs);
+    router.begin(outputs, clock);
   }
   std::vector<uint8_t> dinBytes()
   {
@@ -253,13 +263,13 @@ static void testRouter()
   r.changed();
   CHECK(!r.route(note));
 
+  // Clock goes to the clock engine, which ignores it unless it follows that input
   uint8_t clock = 0xF8;
   MidiMessage tick = {MidiSource::Din, 0, &clock, 1};
-  r.config().clock = ClockSource::Usb;
-  r.changed();
   CHECK(!r.route(tick));
-  r.config().clock = ClockSource::Din;
-  r.changed();
+  rig.clock.config().mode = ClockMode::FollowDin;
+  rig.clock.changed();
+  rig.clock.runDue(0);
   CHECK(r.route(tick));
 
   MidiMessage sysex = msg(MidiSource::Din, {0xF0, 1, 0xF7});
@@ -371,6 +381,258 @@ static void testEventRing()
   CHECK(ring.dropped() == 11); // one slot always stays free
 }
 
+struct ClockLog
+{
+  std::vector<ClockEvent> events;
+  static void listener(const ClockEvent &e, void *ctx) { static_cast<ClockLog *>(ctx)->events.push_back(e); }
+  int count(ClockEvent::Type type) const
+  {
+    int n = 0;
+    for (auto &e : events) n += e.type == type;
+    return n;
+  }
+  std::vector<uint64_t> times(ClockEvent::Type type) const
+  {
+    std::vector<uint64_t> t;
+    for (auto &e : events)
+      if (e.type == type) t.push_back(e.timeUs);
+    return t;
+  }
+};
+
+static int countByte(const std::vector<uint8_t> &bytes, uint8_t b)
+{
+  int n = 0;
+  for (uint8_t x : bytes) n += x == b;
+  return n;
+}
+
+/*! Run the engine every 100 us from the current fake time for `micros`, pumping DIN output
+ *  like the MIDI task does (the test FIFO drains instantly) */
+static OutputRig *gRunRig = nullptr;
+static void runFor(ClockEngine &clock, uint64_t micros)
+{
+  uint64_t end = gFakeMicros64 + micros;
+  for (; gFakeMicros64 < end; gFakeMicros64 += 100) {
+    clock.runDue(gFakeMicros64);
+    if (gRunRig) {
+      gRunRig->serial.drain(128);
+      gRunRig->din.pumpTx();
+    }
+  }
+}
+
+static void testClockInternal()
+{
+  OutputRig rig;
+  gRunRig = &rig;
+  ClockEngine &clock = rig.clock;
+  ClockLog log;
+  clock.addListener(ClockLog::listener, &log);
+  ClockConfig &c = clock.config();
+  CHECK(c.mode == ClockMode::Internal && !c.outputs[0].enabled && c.outputs[1].enabled); // USB by default
+  c.outputs[0] = {true, true, 1};
+  clock.changed();
+
+  // Continuous clock while stopped: 48 ticks per second at 120 BPM, no musical events
+  runFor(clock, 1000000);
+  CHECK(countByte(rig.dinBytes(), 0xF8) == 47); // the 48th tick is due just after 1 s
+  CHECK(log.events.empty());
+
+  // Start: FA, then beat 1 one millisecond later; 8 steps and 2 beats per second
+  clock.start();
+  runFor(clock, 1000000);
+  std::vector<uint8_t> out = rig.dinBytes();
+  CHECK(!out.empty() && out[0] == 0xFA);
+  CHECK(log.count(ClockEvent::Start) == 1 && log.count(ClockEvent::Step) == 8 && log.count(ClockEvent::Beat) == 2);
+  CHECK(log.count(ClockEvent::Bar) == 1);
+  ClockEngine::Snapshot snap = clock.snapshot();
+  CHECK(snap.running && snap.beat == 1 && snap.bar == 0 && snap.bpm == 120.0f);
+
+  // Ticks stay on the 20833.3 us grid without drift
+  std::vector<uint64_t> ticks = log.times(ClockEvent::Tick);
+  CHECK(ticks.size() == 48);
+  CHECK(ticks.size() == 48 && (ticks[47] - ticks[0]) / 47.0 > 20833.0 && (ticks[47] - ticks[0]) / 47.0 < 20834.0);
+
+  // Dividers and multipliers per output
+  c.outputs[0].ratio = -2;
+  clock.changed();
+  runFor(clock, 1000000);
+  CHECK(countByte(rig.dinBytes(), 0xF8) == 24);
+  c.outputs[0].ratio = 3;
+  clock.changed();
+  runFor(clock, 1000000);
+  int multiplied = countByte(rig.dinBytes(), 0xF8);
+  CHECK(multiplied >= 143 && multiplied <= 144);
+
+  // Stop: FC; clock keeps running but steps stop
+  c.outputs[0].ratio = 1;
+  clock.changed();
+  clock.stop();
+  log.events.clear();
+  runFor(clock, 500000);
+  out = rig.dinBytes();
+  CHECK(!out.empty() && out[0] == 0xFC && countByte(out, 0xF8) == 24);
+  CHECK(log.count(ClockEvent::Stop) == 1 && log.count(ClockEvent::Step) == 0);
+
+  // Transport off for an output: no FA there, ticks still go
+  c.outputs[0].transport = false;
+  clock.changed();
+  clock.start();
+  runFor(clock, 100000);
+  out = rig.dinBytes();
+  CHECK(countByte(out, 0xFA) == 0 && countByte(out, 0xF8) > 0);
+
+  // Tempo change takes effect: 60 BPM = 24 ticks per second
+  c.bpm = 60;
+  clock.changed();
+  runFor(clock, 100000);
+  rig.dinBytes();
+  runFor(clock, 1000000);
+  CHECK(countByte(rig.dinBytes(), 0xF8) == 24);
+}
+
+static void testClockSwing()
+{
+  OutputRig rig;
+  gRunRig = &rig;
+  ClockEngine &clock = rig.clock;
+  ClockLog log;
+  clock.addListener(ClockLog::listener, &log);
+  clock.config().swing = 75;
+  clock.changed();
+  clock.start();
+  runFor(clock, 500000);
+  std::vector<uint64_t> steps = log.times(ClockEvent::Step);
+  double tick = 60e6 / (24 * 120.0);
+  // 16th swing at 75%: odd steps move 3 ticks later (9 ticks after the even step), even steps stay put
+  CHECK(steps.size() >= 4);
+  if (steps.size() >= 4) {
+    CHECK(fabs((double)(steps[1] - steps[0]) - 9 * tick) < 2);
+    CHECK(fabs((double)(steps[2] - steps[0]) - 12 * tick) < 2);
+  }
+
+  // 8th swing: the step on the off-beat 8th moves later
+  log.events.clear();
+  clock.config().swingGrid = 8;
+  clock.changed();
+  clock.stop();
+  clock.start();
+  runFor(clock, 500000);
+  steps = log.times(ClockEvent::Step);
+  CHECK(steps.size() >= 4);
+  if (steps.size() >= 4) {
+    CHECK(fabs((double)(steps[2] - steps[0]) - 18 * tick) < 2); // 12 ticks + 0.25 * 24
+  }
+}
+
+static void testClockFollow()
+{
+  OutputRig rig;
+  gRunRig = &rig;
+  ClockEngine &clock = rig.clock;
+  ClockLog log;
+  clock.addListener(ClockLog::listener, &log);
+  ClockConfig &c = clock.config();
+  c.mode = ClockMode::FollowDin;
+  c.outputs[0] = {true, true, 1};
+  clock.changed();
+  clock.runDue(0);
+
+  uint8_t bytes[1];
+  auto send = [&](MidiSource source, uint8_t status) {
+    bytes[0] = status;
+    MidiMessage m = {source, 0, bytes, 1, (uint32_t)gFakeMicros64};
+    return rig.router.route(m);
+  };
+
+  CHECK(!send(MidiSource::Usb, 0xF8)); // not the followed input
+  CHECK(rig.dinBytes().empty());
+
+  CHECK(send(MidiSource::Din, 0xFA));
+  for (int i = 0; i < 30; i++) {
+    gFakeMicros64 += 20833;
+    CHECK(send(MidiSource::Din, 0xF8));
+    clock.runDue(gFakeMicros64);
+  }
+  std::vector<uint8_t> out = rig.dinBytes();
+  CHECK(out.size() == 31 && out[0] == 0xFA && countByte(out, 0xF8) == 30); // passed straight on
+  ClockEngine::Snapshot snap = clock.snapshot();
+  CHECK(snap.locked && snap.running && fabs(snap.bpm - 120.0f) < 0.1f);
+  CHECK(log.count(ClockEvent::Step) == 5);
+
+  // An outlier interval while locked is ignored for the tempo
+  gFakeMicros64 += 5000;
+  send(MidiSource::Din, 0xF8);
+  clock.runDue(gFakeMicros64);
+  CHECK(fabs(clock.snapshot().bpm - 120.0f) < 0.5f);
+
+  // Lost: no tick for 500 ms -> stop, FC sent (decided 2026-11-01)
+  rig.dinBytes();
+  runFor(clock, 600000);
+  snap = clock.snapshot();
+  CHECK(snap.lost && !snap.running && !snap.locked);
+  out = rig.dinBytes();
+  CHECK(out.size() == 1 && out[0] == 0xFC);
+
+  // Transport buttons don't fight a followed clock
+  clock.start();
+  clock.runDue(gFakeMicros64);
+  CHECK(!clock.snapshot().running);
+}
+
+static void testTapTempo()
+{
+  TapTempo tap;
+  CHECK(tap.tap(0) == 0);
+  CHECK(fabsf(tap.tap(500000) - 120) < 0.01f);
+  CHECK(fabsf(tap.tap(1000000) - 120) < 0.01f);
+  CHECK(tap.tap(1100000) == 0); // stray double tap ignored
+  CHECK(fabsf(tap.tap(1500000) - 120) < 0.01f);
+  CHECK(fabsf(tap.tap(2100000) - 60e6f / 525000) < 0.01f); // average of 500, 500, 500, 600 ms
+  CHECK(tap.tap(5000000) == 0);                             // gap over 2 s starts again
+  CHECK(fabsf(tap.tap(5250000) - 240) < 0.01f);
+}
+
+static void testRouterMigration()
+{
+  // Version 1 settings (with the old clock setting) become version 2, and report the clock
+  gFakeNvs.clear();
+  struct
+  {
+    uint8_t version;
+    bool usbToDin, dinToDin, dinToUsb;
+    uint16_t channelMask[2];
+    uint8_t forceChannel[2];
+    ClockSource clock;
+    bool sysex;
+    uint8_t ledLevel;
+  } old;
+  CHECK(sizeof(old) == 14);
+  memset(&old, 0, sizeof(old));
+  old = {1, true, false, true, {0x7FFF, 0xFFFF}, {3, 0}, ClockSource::Usb, true, 3};
+  gFakeNvs["oximate/router"] = std::vector<uint8_t>((uint8_t *)&old, (uint8_t *)&old + sizeof(old));
+
+  HardwareSerial serial;
+  DinMidi din;
+  UsbMidi usb;
+  NoteTracker tracker;
+  MidiOutputs outputs;
+  ClockEngine clock;
+  Router router;
+  din.begin(serial, 0, 0, record);
+  outputs.begin(din, usb, tracker);
+  clock.begin(outputs);
+  router.begin(outputs, clock);
+  ClockSource migrated;
+  CHECK(router.migratedClock(migrated) && migrated == ClockSource::Usb);
+  const RouterConfig &c = router.config();
+  CHECK(c.version == 2 && !c.dinToDin && c.channelMask[0] == 0x7FFF && c.forceChannel[0] == 3 && c.ledLevel == 3);
+
+  clock.migrateFromRouter(ClockMode::FollowUsb, false);
+  CHECK(clock.config().mode == ClockMode::FollowUsb);
+}
+
 int main()
 {
   testDinParser();
@@ -380,6 +642,12 @@ int main()
   testRouter();
   testNoteTracker();
   testEventRing();
+  testClockInternal();
+  testClockSwing();
+  testClockFollow();
+  testTapTempo();
+  gRunRig = nullptr;
+  testRouterMigration();
   printf("%d checks, %d failures\n", gChecks, gFailures);
   return gFailures ? 1 : 0;
 }

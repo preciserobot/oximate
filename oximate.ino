@@ -24,7 +24,8 @@
  */
 #include <M5Unified.h>
 
-#include "src/clock_tracker.h"
+#include "src/clock_engine.h"
+#include "src/clock_page.h"
 #include "src/din_midi.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
@@ -42,14 +43,15 @@ UsbMidi usbMidi;
 DinMidi dinMidi;
 NoteTracker noteTracker;
 MidiOutputs outputs;
-Router router; // route() in the MIDI task; settings edited by the UI
+Router router;           // route() in the MIDI task; settings edited by the UI
+ClockEngine clockEngine; // runs in the MIDI task; settings and transport from the UI
 
 // UI side: Arduino loop() (core 1)
-ClockTracker clockTracker;
 Leds leds;
 Ui ui;
 Monitor monitor;
-RouterPage routerPage(router, leds);
+RouterPage routerPage(router, leds, clockEngine);
+ClockPage clockPage(clockEngine, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
 void onMidi(const MidiMessage &msg)
@@ -64,15 +66,23 @@ void setup()
   Serial.begin(115200);
   SpiBus::begin();
 
-  ui.begin(clockTracker);
+  ui.begin(clockEngine);
   monitor.begin();
   ui.addPage(monitor);
   ui.addPage(routerPage);
+  ui.addPage(clockPage);
 
   // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2)
   dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
   outputs.begin(dinMidi, usbMidi, noteTracker);
-  router.begin(outputs);
+  clockEngine.begin(outputs);
+  router.begin(outputs, clockEngine);
+  ClockSource oldClock;
+  if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
+    static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
+                                       ClockMode::Internal};
+    clockEngine.migrateFromRouter(kModes[(int)oldClock], oldClock == ClockSource::Off);
+  }
 
   leds.begin();
   leds.setLevel(router.config().ledLevel);
@@ -91,7 +101,7 @@ void setup()
     while (true) delay(1000);
   }
 
-  MidiTask::start(usbMidi, dinMidi);
+  MidiTask::start(usbMidi, dinMidi, clockEngine);
   Serial.println("OxiMate running");
 }
 
@@ -100,7 +110,6 @@ void loop()
   MidiEvent event;
   while (MidiTask::events().pop(event)) {
     MidiMessage msg = event.message();
-    clockTracker.track(msg);
     leds.activity(msg);
     monitor.log(msg, event.forwarded, event.length);
   }
@@ -108,7 +117,9 @@ void loop()
   M5.update();
   ui.setUsbDevice(usbMidi.connected(), usbMidi.vendorId(), usbMidi.productId());
   ui.poll();
+  clockPage.pollImu();
   leds.update();
   router.poll();
+  clockEngine.poll();
   delay(1); // let the idle task run; the UI doesn't need more than ~1 kHz
 }

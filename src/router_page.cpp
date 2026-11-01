@@ -17,22 +17,8 @@ static constexpr int kOptionsY = kDinGridY + kGridHeight + 4;
 static constexpr int kRouteChipWidth = 320 / 3;
 static constexpr int kOptionChipWidth = 320 / 4;
 
-static constexpr uint16_t kOnColor = TFT_DARKGREEN;
-static constexpr uint16_t kOffColor = 0x2945; // dark grey
-static constexpr uint16_t kOffTextColor = TFT_LIGHTGREY;
-
 static const char *const kLedLevels[] = {"LEDs:off", "LEDs:low", "LEDs:med", "LEDs:high"};
-static const char *const kClockNames[] = {"Clk both", "Clk USB", "Clk DIN", "Clk off"};
-
-static void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t onColor = kOnColor)
-{
-  M5.Display.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 4, on ? onColor : kOffColor);
-  uint16_t textColor = on ? (onColor == kOnColor ? TFT_WHITE : TFT_BLACK) : kOffTextColor;
-  M5.Display.setTextColor(textColor);
-  M5.Display.setTextDatum(middle_center);
-  M5.Display.drawString(text, x + w / 2, y + h / 2);
-  M5.Display.setTextDatum(top_left);
-}
+static const char *const kClockNames[] = {"Clk INT", "Clk USB", "Clk DIN"};
 
 static void drawChannelGrid(int y, uint16_t mask, uint16_t color)
 {
@@ -74,8 +60,8 @@ void RouterPage::draw()
   char usbForce[10], dinForce[10];
   forceChannelText("USB", c.forceChannel[(int)MidiSource::Usb], usbForce, sizeof(usbForce));
   forceChannelText("DIN", c.forceChannel[(int)MidiSource::Din], dinForce, sizeof(dinForce));
-  drawChip(0 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, kClockNames[(int)c.clock],
-           c.clock != ClockSource::Off);
+  drawChip(0 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, kClockNames[(int)_clock.config().mode],
+           true);
   drawChip(1 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, c.sysex ? "SysEx on" : "SysEx off",
            c.sysex);
   drawChip(2 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, usbForce,
@@ -102,7 +88,12 @@ void RouterPage::onTouch(int x, int y)
     c.channelMask[(int)input] ^= (1 << ch);
   } else if (inRow(kOptionsY, kChipHeight)) {
     switch (x / kOptionChipWidth) {
-      case 0: c.clock = (ClockSource)(((int)c.clock + 1) % 4); break;
+      case 0: { // shortcut for the Clock page's source setting
+        ClockConfig &clock = _clock.config();
+        clock.mode = (ClockMode)(((int)clock.mode + 1) % 3);
+        _clock.changed();
+        break;
+      }
       case 1: c.sysex = !c.sysex; break;
       case 2: c.forceChannel[(int)MidiSource::Usb] = (c.forceChannel[(int)MidiSource::Usb] + 1) % 17; break;
       default: c.forceChannel[(int)MidiSource::Din] = (c.forceChannel[(int)MidiSource::Din] + 1) % 17; break;

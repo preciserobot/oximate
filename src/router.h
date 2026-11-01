@@ -4,8 +4,10 @@
 #include "sync.h"
 
 class MidiOutputs;
+class ClockEngine;
 
-/*! Which input's clock and transport (F8, FA, FB, FC, F2) is forwarded */
+/*! Version 1 setting: which input's clock was forwarded. Only used to migrate old settings;
+ *  since version 2 the clock engine owns clock and transport (see stage 8). */
 enum class ClockSource : uint8_t
 {
   Both = 0,
@@ -17,7 +19,7 @@ enum class ClockSource : uint8_t
 /*! Routing settings, persisted in NVS. Bump kVersion when the layout changes. */
 struct RouterConfig
 {
-  static constexpr uint8_t kVersion = 1;
+  static constexpr uint8_t kVersion = 2;
 
   uint8_t version = kVersion;
   bool usbToDin = true;                     ///< USB device -> DIN OUT (+ SAM2695)
@@ -25,7 +27,6 @@ struct RouterConfig
   bool dinToUsb = true;                     ///< DIN IN -> USB device
   uint16_t channelMask[2] = {0xFFFF, 0xFFFF}; ///< per input (MidiSource), bit n = channel n+1 passes
   uint8_t forceChannel[2] = {0, 0};         ///< per input: 0 = keep, 1..16 = rewrite to this channel
-  ClockSource clock = ClockSource::Both;
   bool sysex = true;
   uint8_t ledLevel = 2;                     ///< 0 off, 1 low, 2 medium, 3 high
 };
@@ -35,7 +36,7 @@ struct RouterConfig
 class Router
 {
 public:
-  void begin(MidiOutputs &outputs);
+  void begin(MidiOutputs &outputs, ClockEngine &clock);
 
   /*! Forward a message; returns false if it was filtered out completely (MIDI task) */
   bool route(const MidiMessage &msg);
@@ -44,6 +45,9 @@ public:
   void changed();       ///< apply config() to the MIDI task now; saved after a short delay
   void resetDefaults();
   void poll();          ///< performs delayed saves (UI)
+
+  /*! True if version 1 settings were migrated at boot; `clock` is their clock setting */
+  bool migratedClock(ClockSource &clock) const;
 
 private:
   static bool passes(const RouterConfig &config, const MidiMessage &msg);
@@ -55,6 +59,9 @@ private:
   RouterConfig _active; // read by route(), replaced under _lock
   CriticalSection _lock;
   MidiOutputs *_outputs = nullptr;
+  ClockEngine *_clock = nullptr;
+  bool _migrated = false;
+  ClockSource _migratedClock = ClockSource::Both;
   uint32_t _changedMillis = 0;
   bool _dirty = false;
 };

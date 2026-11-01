@@ -1,7 +1,7 @@
 #pragma once
 
 #include <M5Unified.h>
-#include "clock_tracker.h"
+#include "clock_engine.h"
 #include "spi_bus.h"
 
 /*! Holds the shared SPI bus and an M5GFX write transaction. Keep each one short (a few ms):
@@ -29,7 +29,13 @@ constexpr int kContentHeight = kFooterTop - kContentTop;
 constexpr uint16_t kUsbColor = TFT_CYAN;
 constexpr uint16_t kDinColor = TFT_ORANGE;
 constexpr uint16_t kBarColor = TFT_NAVY;
+constexpr uint16_t kOnColor = TFT_DARKGREEN;
+constexpr uint16_t kOffColor = 0x2945; // dark grey
+constexpr uint16_t kOffTextColor = TFT_LIGHTGREY;
 } // namespace Layout
+
+/*! A rounded, labelled touch target; the caller holds a DisplayLock */
+void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t onColor = Layout::kOnColor);
 
 /*! One screen of the UI. Touch buttons A/B/C belong to the active page. */
 class Page
@@ -39,8 +45,11 @@ public:
   virtual const char *title() const = 0;
   virtual void buttonLabels(const char *labels[3]) const = 0;
   virtual void onButton(int index) = 0;     ///< 0 = A, 1 = B, 2 = C
+  virtual void onButtonHold(int index) {}   ///< a touch button held (~0.5 s) instead of clicked
   virtual void onTouch(int x, int y) {}     ///< taps in the content area
   virtual void enter() { _dirty = true; }   ///< page became visible
+  virtual void leave() {}                   ///< another page is about to be shown
+  virtual void tick() {}                    ///< every loop while visible (animations, LEDs)
   virtual void draw() = 0;                  ///< redraw the content area (only called when dirty()); takes DisplayLock itself
 
   bool dirty() const { return _dirty; }
@@ -59,7 +68,7 @@ class Ui
 public:
   static constexpr int kMaxPages = 8;
 
-  void begin(const ClockTracker &clock);
+  void begin(const ClockEngine &clock);
   void addPage(Page &page);
   void poll();                ///< handle buttons and touch, redraw what changed
   void footerChanged() { _footerDirty = true; }
@@ -70,7 +79,7 @@ private:
   void drawHeader();
   void drawFooter();
 
-  const ClockTracker *_clock = nullptr;
+  const ClockEngine *_clock = nullptr;
   Page *_pages[kMaxPages] = {nullptr};
   int _pageCount = 0;
   int _current = 0;

@@ -41,6 +41,7 @@ private:
 
 class UsbMidi;
 class DinMidi;
+class ClockEngine;
 
 /*! The MIDI task: owns USB, DIN, router and outputs, and runs every millisecond on its
  *  own core, so screen redraws can't delay MIDI. Everything it learns goes to the UI
@@ -51,6 +52,6 @@ constexpr int kCore = 0;      ///< see README "Shared infrastructure" (radio sta
 constexpr int kPriority = 10; ///< above loopTask (1), below the radio stacks (18-23)
 constexpr uint32_t kStackBytes = 8192;
 
-void start(UsbMidi &usb, DinMidi &din);
+void start(UsbMidi &usb, DinMidi &din, ClockEngine &clock);
 EventRing &events();
 } // namespace MidiTask

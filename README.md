@@ -25,7 +25,7 @@ synth.
 | 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
 | 6 | [Preview synth](#stage-6-preview-synth) | — | planned (full plan) |
 | 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
-| 8 | [Clock master](#stage-8-clock-master) | partly | M1–M2 done (MIDI task, DIN priority); needs hardware test |
+| 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | idea |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | idea |
@@ -189,9 +189,9 @@ defaults to channel 15. The Oxi encoder CCs use the M8's control channel.
 with the event ring to the UI, the SPI bus lock (`src/spi_bus.*`), DIN
 output with realtime priority, timestamps on every message, `MidiOutputs`
 and `NoteTracker`, and the router sending through them with its settings
-handed over safely between cores. Not built yet: the hardware timer and
-`ClockEngine` (stage 8, M3 onwards), input interceptors/observers, LED
-claims, and the panic job.
+handed over safely between cores. The `ClockEngine` with its
+`esp_timer` wake-up and LED claims came with stage 8. Not built yet: input
+interceptors/observers and the panic job.
 
 **Suggested build order:** first the stage 8 timing core (its milestones 1–2)
 and the stage 16 output layer (its milestone 1). These are the foundation.
@@ -265,7 +265,7 @@ bar behaviour is described under Architecture.
 │ [9][10]...         [16]                │
 │ DIN in channels                        │
 │ [1]...                                 │
-│ [Clk both][SysEx on][USB>keep][DIN>keep]
+│ [Clk INT][SysEx on][USB>keep][DIN>keep] │
 │   All ch       LEDs:med     Defaults   │  touch buttons A / B / C
 └────────────────────────────────────────┘
 ```
@@ -273,9 +273,9 @@ bar behaviour is described under Architecture.
 * **Routes**: turn USB→DIN, DIN→DIN (software thru) and DIN→USB on or off
   individually.
 * **Channel filter** per input: blocked channels are dropped before routing.
-* **Clock**: forward clock and transport (F8, FA, FB, FC, F2) from both
-  inputs, USB only, DIN only, or neither. Two clock sources merged together
-  would double the tempo, so choose one when both inputs send clock.
+* **Clock**: since stage 8 this chip is a shortcut for the Clock page's
+  source (`Clk INT` / `Clk USB` / `Clk DIN`). Clock and transport never pass
+  through the router; the clock engine is their only sender.
 * **SysEx**: forward it or not.
 * **Force channel** per input (`USB>keep` / `USB>ch5`): rewrites the channel
   of every channel message from that input. Each tap moves to the next value:
@@ -408,6 +408,22 @@ Internal MIDI clock, and the **timing architecture every later stage uses**.
   `ClockTracker` is retired.
 * **Clock page:** big BPM, source chips, outputs view. A Start/Stop, B Tap,
   C Outputs.
+
+**Implemented (2026-11-01)**, with these differences from the plan:
+
+* The timer is a one-shot `esp_timer` (same microsecond time base as
+  `micros()`) instead of a raw hardware timer; its callback only wakes the MIDI
+  task.
+* Tap tempo is computed on the UI side and written to the tempo setting, so
+  nothing writes settings back across cores. A tap doesn't realign the beat
+  phase yet.
+* Internal clock is sent continuously, also while stopped, so followers
+  always know the tempo. Step, beat and bar events only run while playing.
+* Tempo is changed with ±1 / ±0.1 chips; dragging the digits isn't built.
+  "Rewind" sends song position 0 while stopped.
+* The clock takes over the LED bar only while the Clock page is visible.
+* Not built yet: the metronome events for stage 10 and the gate output for
+  stage 20.
 
 **Full plan:** [docs/stages/stage-8.md](docs/stages/stage-8.md)
 
@@ -587,7 +603,10 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/router.*`      | filtering, remapping, routing; settings saved in NVS |
 | `src/router_page.*` | the Router page |
 | `src/leds.*`        | GO Bottom2 LED bar |
-| `src/clock_tracker.h` | BPM and transport per input |
+| `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
+| `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |
+| `src/tap_tempo.h`   | tap tempo averaging |
+| `src/platform_time.h` | 64-bit microsecond clock (esp_timer) |
 | `src/ui.*`          | page switching, header and footer |
 
 ## Credits

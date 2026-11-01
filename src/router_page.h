@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clock_engine.h"
 #include "leds.h"
 #include "router.h"
 #include "ui.h"
@@ -8,7 +9,7 @@
 class RouterPage : public Page
 {
 public:
-  RouterPage(Router &router, Leds &leds) : _router(router), _leds(leds) {}
+  RouterPage(Router &router, Leds &leds, ClockEngine &clock) : _router(router), _leds(leds), _clock(clock) {}
 
   const char *title() const override { return "Router"; }
   void buttonLabels(const char *labels[3]) const override;
@@ -21,4 +22,5 @@ private:
 
   Router &_router;
   Leds &_leds;
+  ClockEngine &_clock;
 };
