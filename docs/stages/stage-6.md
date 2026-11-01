@@ -6,6 +6,10 @@
 > * The router TX observer is a `MidiOutputs` listener.
 > * `Leds::setOverride(first, count)`/`setPixel()` → use the shared LED claim API.
 > * Channel 16 stays reserved as the SAM2695 settings channel for all stages.
+>
+> **Decided 2026-11-01:**
+>
+> * Elektron gear on DIN OUT responds on all channels, and **program changes on channel 16 would switch Elektron patterns** in Separate mode. Show a warning on the Synth page, and document turning off PC receive on the Elektron or using Bypass mode.
 
 Turns the SAM2695 in the Unit MIDI into a controlled sound source:
 * choose which channels it plays

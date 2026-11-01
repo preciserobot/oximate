@@ -5,6 +5,12 @@
 >
 > * `MidiOutputs` and `NoteTracker` are shared infrastructure, built before the first stage that generates MIDI.
 > * LED warning overlays sit above any LED claim (see the shared LED claim API).
+>
+> **Decided 2026-11-01:**
+>
+> * The global trigger is the **power button**, as recommended.
+> * Panic also sends **Stop** (`FC`).
+> * Stuck notes are **released automatically** after the threshold (default 30 s), not just warned about.
 
 Get rid of stuck notes quickly, prevent them from happening, and show what
 OxiMate is doing. This stage also defines the **note tracker** and a single

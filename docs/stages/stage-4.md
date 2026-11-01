@@ -6,6 +6,10 @@
 > * `MidiSource::Internal` / `Router::sendInternal()` → use the shared `MidiOutputs::send()` with an `Internal` origin.
 > * Push traffic handling in `onMidi()` → register as an input interceptor.
 > * LED bar → use the shared LED claim API.
+>
+> **Decided 2026-11-01:**
+>
+> * Tracks are **switchable** drum/melodic, default to **channels 1, 2, 3 …** in order, and go to **DIN OUT**.
 
 Use an Ableton Push 2 without a computer, with OxiMate as its USB host. The
 Push 2 has no standalone mode. It works in two modes:

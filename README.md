@@ -165,6 +165,23 @@ piece is built by the first stage that needs it.
 | `SamSynth` | 6 | the only code that talks to the SAM2695; stages claim parts |
 | `StepSequencer` | 4 | pattern/step core shared by the Push 2 sequencer and the drum machine |
 
+### Decisions (2026-11-01)
+
+| Topic | Decision |
+|-------|----------|
+| Oxi One | **MK1** (remote protocol model byte `00`); firmware version still to check |
+| M8 | **Model:02**, connected to OxiMate's MIDI OUT with **TRS type A**. Check which TRS type the Unit MIDI's 3.5 mm jacks use; if it isn't type A, use the DIN jack with a DIN-to-TRS-A adapter. The M8's control channel is still to be read off the M8 |
+| Push 2 | the power supply is available. Tracks are **switchable** between drum and melodic, use **channels 1, 2, 3 …** in order, and go to **DIN OUT** (the Push takes the USB port) |
+| SD card | available, and will be fitted when a stage needs it (drum banks, patterns, recordings) |
+| Channel 16 | no gear uses it. Reserved for SAM2695 settings |
+| Elektron gear | it responds on all channels, so in Separate mode it receives synth-setup program changes (channel 16) and trainer notes (channel 15). **Program changes switch Elektron patterns.** Either turn off program-change receive (or the relevant channels) in the Elektron MIDI settings, or put the Unit MIDI in **Bypass** while using stages 6/7. Stage 6 shows a warning about this |
+| Clock output | sent to **USB by default**, switchable to DIN (per output) |
+| External clock lost | OxiMate **stops** |
+| Panic trigger | **power button** (short press = levels 1+2, ~1.5 s hold = level 3) |
+| Panic and transport | panic also sends **Stop** (`FC`) |
+| Stuck notes | **released automatically** after the threshold (default 30 s) |
+| Drum machine | **32 steps** (two pages of 16 pads). A USB pad controller can **play lanes live and record** into steps |
+
 **Channel 16 is reserved** for SAM2695 settings (stage 6). The ear trainer
 defaults to channel 15. The Oxi encoder CCs use the M8's control channel.
 
@@ -298,6 +315,8 @@ as its host.
   probability per step, 16 patterns, driven by stage 8's clock engine. Its
   core, `src/step_sequencer.*`, is reused by stage 5.
 * **Play mode:** keyboard pads, encoders as CCs, touch strip.
+* Tracks switch between drum and melodic, use channels 1, 2, 3 … and go
+  to DIN OUT.
 * LED updates are batched and only sent on change. The Push display stays
   dark (one frame takes 0.5–1 s at full speed); an optional experiment only.
 * DIN→USB is switched off while a Push is connected.
@@ -309,7 +328,7 @@ as its host.
 A touch-screen drum machine playing the SAM2695 drum kits (and DIN OUT) on
 channel 10.
 
-* 8 lanes × 16 steps; each step off, on or accent; 16 patterns per bank;
+* 8 lanes × **32 steps** (two pages of 16 pads); each step off, on or accent; 16 patterns per bank;
   queued pattern switches and chaining; swing from the clock engine.
 * **UI:** one lane at a time as 16 large pads with an overview of all lanes
   below (an 8×16 grid of tappable cells doesn't fit a 2" screen). Grid,
@@ -445,7 +464,7 @@ Get out of stuck-note situations quickly, and see what's going on.
   level 3 (a 6 s hold still powers off). Fallbacks: header hold, button C on
   the Diagnostics page.
 * **Automatic release:** on USB disconnect, Active Sensing timeout, and
-  before a router change takes effect. Stuck-note warning after 30 s.
+  before a router change takes effect. Stuck notes are released automatically after 30 s.
 * **Diagnostics page:** channel activity, message counters and rates, DIN
   TX buffer, dropped SysEx, USB errors, heap/PSRAM, battery.
 

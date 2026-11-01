@@ -7,6 +7,11 @@
 > * `MidiSource::Internal` / `Router::sendInternal()` → use the shared `MidiOutputs::send()` with an `Internal` origin.
 > * `setOwner()`/`setPixel()` → use the shared LED claim API.
 > * Consuming Oxi events in `onMidi()` → register as an input interceptor.
+>
+> **Decided 2026-11-01:**
+>
+> * Oxi One **MK1**: use model byte `00`. Check the firmware version in M0.
+> * M8 **Model:02** over **TRS type A** from OxiMate's MIDI OUT (check the Unit MIDI's TRS type). The control channel is still to be read off the M8.
 
 ## Goal
 

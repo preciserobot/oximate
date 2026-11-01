@@ -5,6 +5,11 @@
 >
 > * `MidiSource::Internal` / `Router::sendInternal()` → use the shared `MidiOutputs::send()` with an `Internal` origin.
 > * The SAM2695 drum voice is configured through stage 6's `SamSynth` part API.
+>
+> **Decided 2026-11-01:**
+>
+> * **32 steps** per pattern: two pages of 16 pads, with the LED playhead covering two pages.
+> * A **USB pad controller** can play lanes live and record into steps. It's an input observer, mapped by note number to lane.
 
 A pocket drum machine. It plays the SAM2695's General MIDI drum kit and the
 same pattern on DIN OUT, so external drums can follow. It's driven by the

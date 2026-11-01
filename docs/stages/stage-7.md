@@ -6,6 +6,10 @@
 > * The trainer's default channel is **15**, not 16. Channel 16 is reserved for SAM2695 settings by stage 6. The trainer claims a synth part through `SamSynth`.
 > * `Page::onMidi()` → register as an input observer.
 > * `Leds::setOverride()`/`setPixel()` → use the shared LED claim API.
+>
+> **Decided 2026-11-01:**
+>
+> * Elektron gear on all channels will also play trainer notes (channel 15) in Separate mode. Recommend Bypass mode while training.
 
 Stage 7 adds two pages:
 

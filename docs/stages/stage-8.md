@@ -5,6 +5,11 @@
 >
 > * DIN realtime-priority output lives behind the shared `MidiOutputs` layer from stage 16.
 > * `ClockTracker` is replaced as described here. The stage 9 analyser keeps its own statistics in `clock_stats`.
+>
+> **Decided 2026-11-01:**
+>
+> * Clock output defaults to **USB**, switchable to DIN, per output.
+> * When the external clock is lost, OxiMate **stops**.
 
 Stage 8 does two things:
 
