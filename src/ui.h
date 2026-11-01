@@ -9,7 +9,7 @@
 class DisplayLock
 {
 public:
-  DisplayLock() { M5.Display.startWrite(); }
+  explicit DisplayLock(const char *holder = "display") : _bus(holder) { M5.Display.startWrite(); }
   ~DisplayLock() { M5.Display.endWrite(); }
 
 private:
@@ -34,8 +34,9 @@ constexpr uint16_t kOffColor = 0x2945; // dark grey
 constexpr uint16_t kOffTextColor = TFT_LIGHTGREY;
 } // namespace Layout
 
-/*! A rounded, labelled touch target; the caller holds a DisplayLock */
-void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t onColor = Layout::kOnColor);
+/*! A rounded, labelled touch target, drawn on `target` (normally the page's canvas) */
+void drawChip(LovyanGFX &target, int x, int y, int w, int h, const char *text, bool on,
+              uint16_t onColor = Layout::kOnColor);
 
 /*! One screen of the UI. Touch buttons A/B/C belong to the active page. */
 class Page
@@ -50,7 +51,10 @@ public:
   virtual void enter() { _dirty = true; }   ///< page became visible
   virtual void leave() {}                   ///< another page is about to be shown
   virtual void tick() {}                    ///< every loop while visible (animations, LEDs)
-  virtual void draw() = 0;                  ///< redraw the content area (only called when dirty()); takes DisplayLock itself
+  /*! Redraw the content area (only called when dirty()) on canvas(), a full-screen off-screen
+   *  buffer: draw with the usual screen coordinates. The Ui pushes the content area afterwards,
+   *  in slices, so the shared SPI bus is never held long. */
+  virtual void draw() = 0;
 
   bool dirty() const { return _dirty; }
   void clean() { _dirty = false; }
@@ -62,13 +66,17 @@ public:
     return dirty;
   }
 
+  void setCanvas(M5Canvas *canvas) { _canvas = canvas; }
+
 protected:
   void markDirty() { _dirty = true; }
   void markFooterDirty() { _footerDirty = true; }
+  M5Canvas &canvas() { return *_canvas; }
 
 private:
   bool _dirty = true;
   bool _footerDirty = false;
+  M5Canvas *_canvas = nullptr;
 };
 
 /*! Owns page switching (tap the header), the header/footer bars and redraw throttling */
@@ -94,6 +102,11 @@ private:
   void drawBattery();
 
   const ClockEngine *_clock = nullptr;
+  void pushContent();
+
+  M5Canvas _content{&M5.Display}; // full screen, in PSRAM; pages draw here
+  M5Canvas _header{&M5.Display};
+  M5Canvas _footer{&M5.Display};
   Page *_pages[kMaxPages] = {nullptr};
   int _pageCount = 0;
   int _current = 0;

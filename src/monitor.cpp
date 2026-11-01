@@ -64,15 +64,7 @@ void describeMidi(const MidiMessage &msg, char *out, size_t size, uint16_t total
   snprintf(out, size, "%-4s %2s %s", source, channel, body);
 }
 
-void Monitor::begin()
-{
-  for (M5Canvas &band : _bands) {
-    band.setColorDepth(8);
-    band.createSprite(M5.Display.width(), kLinesPerBand * kCharHeight);
-    band.setFont(&fonts::AsciiFont8x16);
-    band.setTextWrap(false);
-  }
-}
+void Monitor::begin() {}
 
 void Monitor::log(const MidiMessage &msg, bool forwarded, uint16_t totalLength)
 {
@@ -128,20 +120,21 @@ void Monitor::onButton(int index)
 
 void Monitor::draw()
 {
-  // Oldest line at the top, newest at the bottom; screen row r shows log line r - (kLines - _count)
+  // Oldest line at the top, newest at the bottom; each line is padded so no clear is needed
+  M5Canvas &c = canvas();
   int first = (_head - _count + kLines) % kLines;
-  for (int b = 0; b < kBands; b++) {
-    M5Canvas &band = _bands[b];
-    band.fillScreen(TFT_BLACK);
-    for (int r = 0; r < kLinesPerBand; r++) {
-      int i = b * kLinesPerBand + r - (kLines - _count);
-      if (i < 0) continue;
-      const Line &line = _lines[(first + i) % kLines];
-      band.setTextColor(line.color);
-      band.setCursor(0, r * kCharHeight);
-      band.print(line.text);
+  for (int r = 0; r < kLines; r++) {
+    int i = r - (kLines - _count);
+    int y = kContentTop + r * kCharHeight;
+    if (i < 0) {
+      c.fillRect(0, y, c.width(), kCharHeight, TFT_BLACK);
+      continue;
     }
-    DisplayLock lock;
-    band.pushSprite(0, kContentTop + b * kLinesPerBand * kCharHeight);
+    const Line &line = _lines[(first + i) % kLines];
+    char padded[kLineLength];
+    snprintf(padded, sizeof(padded), "%-40s", line.text);
+    c.setTextColor(line.color, TFT_BLACK);
+    c.setCursor(0, y);
+    c.print(padded);
   }
 }

@@ -7,21 +7,23 @@ static constexpr int kHeaderTapHeight = kHeaderHeight + 4; // a little more than
 static constexpr int kSwipeMin = 140;          // pixels sideways for a page swipe (almost half the screen)
 static constexpr uint32_t kSwipeMinMillis = 100; // shorter gestures are taps or touch jitter
 
-void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t onColor)
+static constexpr int kSlices = 8; // content pushed in slices of 25 rows (~3 ms of bus each)
+
+void drawChip(LovyanGFX &target, int x, int y, int w, int h, const char *text, bool on, uint16_t onColor)
 {
-  M5.Display.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 4, on ? onColor : kOffColor);
+  target.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 4, on ? onColor : kOffColor);
   uint16_t textColor = on ? (onColor == kOnColor ? TFT_WHITE : TFT_BLACK) : kOffTextColor;
-  M5.Display.setTextColor(textColor);
-  M5.Display.setTextDatum(middle_center);
-  M5.Display.drawString(text, x + w / 2, y + h / 2);
-  M5.Display.setTextDatum(top_left);
+  target.setTextColor(textColor);
+  target.setTextDatum(middle_center);
+  target.drawString(text, x + w / 2, y + h / 2);
+  target.setTextDatum(top_left);
 }
 static constexpr uint32_t kHeaderMillis = 500;   // BPM readout changes without other events
 static constexpr uint32_t kBatteryMillis = 5000; // battery level is read this often
 
 void Ui::splash(const char *status)
 {
-  DisplayLock lock;
+  DisplayLock lock("splash");
   static bool drawn = false;
   int w = M5.Display.width(), h = M5.Display.height();
   if (!drawn) { // the banner once; later calls only update the status line
@@ -49,7 +51,22 @@ void Ui::splash(const char *status)
 void Ui::begin(const ClockEngine &clock)
 {
   _clock = &clock;
-  DisplayLock lock;
+  // Header and footer are drawn off-screen and pushed in one go: drawing text straight to the
+  // display held the shared SPI bus for ~8 ms, delaying USB reads
+  for (M5Canvas *bar : {&_header, &_footer}) {
+    bar->setColorDepth(16);
+    bar->setFont(&fonts::AsciiFont8x16);
+    bar->setTextWrap(false);
+  }
+  _header.createSprite(M5.Display.width(), kHeaderHeight);
+  _content.setPsram(true);
+  _content.setColorDepth(16);
+  _content.createSprite(M5.Display.width(), M5.Display.height());
+  _content.setFont(&fonts::AsciiFont8x16);
+  _content.setTextWrap(false);
+  _content.fillScreen(TFT_BLACK);
+  _footer.createSprite(M5.Display.width(), M5.Display.height() - kFooterTop);
+  DisplayLock lock("begin");
   M5.Display.fillScreen(TFT_BLACK);
   M5.Display.setFont(&fonts::AsciiFont8x16);
   M5.Display.setTextWrap(false);
@@ -58,7 +75,22 @@ void Ui::begin(const ClockEngine &clock)
 void Ui::addPage(Page &page)
 {
   if (_pageCount < kMaxPages) {
+    page.setCanvas(&_content);
     _pages[_pageCount++] = &page;
+  }
+}
+
+/*! Push the content area from the canvas in slices, releasing the bus in between */
+void Ui::pushContent()
+{
+  int height = kFooterTop - kContentTop;
+  for (int i = 0; i < kSlices; i++) {
+    int top = kContentTop + i * height / kSlices;
+    int bottom = kContentTop + (i + 1) * height / kSlices;
+    DisplayLock lock("content");
+    M5.Display.setClipRect(0, top, M5.Display.width(), bottom - top);
+    _content.pushSprite(0, 0);
+    M5.Display.clearClipRect();
   }
 }
 
@@ -66,10 +98,7 @@ void Ui::show(int index)
 {
   _pages[_current]->leave();
   _current = index;
-  {
-    DisplayLock lock;
-    M5.Display.fillRect(0, kHeaderHeight, M5.Display.width(), kFooterTop - kHeaderHeight, TFT_BLACK);
-  }
+  _content.fillRect(0, kContentTop, _content.width(), kFooterTop - kContentTop, TFT_BLACK);
   _pages[_current]->enter();
   _headerDirty = _footerDirty = true;
 }
@@ -156,6 +185,7 @@ void Ui::poll()
   if (page.dirty()) {
     page.clean(); // before draw() so changes made while drawing trigger another frame
     page.draw();
+    pushContent();
   }
   if (_footerDirty) {
     drawFooter();
@@ -192,36 +222,38 @@ void Ui::drawHeader()
   // Columns: title 0-7, USB 9-14, clock 16-29; battery on the right
   char text[48];
   snprintf(text, sizeof(text), "%-8s %-6s %s", title, usb, clockText);
-  DisplayLock lock;
-  M5.Display.fillRect(0, 0, M5.Display.width(), kHeaderHeight, kBarColor);
-  M5.Display.setTextColor(TFT_WHITE, kBarColor);
-  M5.Display.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
-  M5.Display.print(text);
+  M5Canvas &bar = _header;
+  bar.fillScreen(kBarColor);
+  bar.setTextColor(TFT_WHITE, kBarColor);
+  bar.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
+  bar.print(text);
   drawBattery();
   if (_flashUntil) {
     const int x = 16 * kCharWidth; // where the clock text starts
-    M5.Display.fillRect(x, 0, M5.Display.width() - x, kHeaderHeight, _flashColor);
-    M5.Display.setTextColor(TFT_WHITE, _flashColor);
-    M5.Display.setCursor(x + 4, (kHeaderHeight - kCharHeight) / 2);
-    M5.Display.print(_flashText);
+    bar.fillRect(x, 0, bar.width() - x, kHeaderHeight, _flashColor);
+    bar.setTextColor(TFT_WHITE, _flashColor);
+    bar.setCursor(x + 4, (kHeaderHeight - kCharHeight) / 2);
+    bar.print(_flashText);
   }
+  DisplayLock lock("drawHeader");
+  bar.pushSprite(0, 0);
 }
 
 /*! Small battery symbol plus percentage at the right end of the header (caller holds the lock) */
 void Ui::drawBattery()
 {
-  const int textX = M5.Display.width() - 4 * kCharWidth - 2; // "100%"
+  const int textX = _header.width() - 4 * kCharWidth - 2; // "100%"
   const int iconX = textX - 24, iconY = 5, iconW = 18, iconH = 10;
   uint16_t color = _charging ? TFT_CYAN
                    : _batteryLevel < 0 ? TFT_LIGHTGREY
                    : _batteryLevel < 20 ? TFT_RED
                    : _batteryLevel <= 50 ? TFT_YELLOW
                                          : TFT_GREEN;
-  M5.Display.drawRect(iconX, iconY, iconW, iconH, color);
-  M5.Display.fillRect(iconX + iconW, iconY + 3, 2, iconH - 6, color); // terminal
+  _header.drawRect(iconX, iconY, iconW, iconH, color);
+  _header.fillRect(iconX + iconW, iconY + 3, 2, iconH - 6, color); // terminal
   if (_batteryLevel > 0) {
     int fill = (iconW - 4) * (_batteryLevel > 100 ? 100 : _batteryLevel) / 100;
-    M5.Display.fillRect(iconX + 2, iconY + 2, fill < 1 ? 1 : fill, iconH - 4, color);
+    _header.fillRect(iconX + 2, iconY + 2, fill < 1 ? 1 : fill, iconH - 4, color);
   }
   char percent[6];
   if (_batteryLevel < 0) {
@@ -230,9 +262,9 @@ void Ui::drawBattery()
     snprintf(percent, sizeof(percent), _charging ? "+%d" : "%3d", (int)_batteryLevel);
   }
   if (!_charging) strcat(percent, "%");
-  M5.Display.setTextColor(color, kBarColor);
-  M5.Display.setCursor(textX, (kHeaderHeight - kCharHeight) / 2);
-  M5.Display.print(percent);
+  _header.setTextColor(color, kBarColor);
+  _header.setCursor(textX, (kHeaderHeight - kCharHeight) / 2);
+  _header.print(percent);
 }
 
 void Ui::drawFooter()
@@ -241,12 +273,14 @@ void Ui::drawFooter()
   const char *labels[3] = {"", "", ""};
   _pages[_current]->buttonLabels(labels);
   const int centers[3] = {53, 160, 267};
-  DisplayLock lock;
-  M5.Display.fillRect(0, kFooterTop, M5.Display.width(), M5.Display.height() - kFooterTop, kBarColor);
-  M5.Display.setTextColor(TFT_WHITE, kBarColor);
-  M5.Display.setTextDatum(top_center);
+  M5Canvas &bar = _footer;
+  bar.fillScreen(kBarColor);
+  bar.setTextColor(TFT_WHITE, kBarColor);
+  bar.setTextDatum(top_center);
   for (int i = 0; i < 3; i++) {
-    M5.Display.drawString(labels[i], centers[i], kFooterTop + 1);
+    bar.drawString(labels[i], centers[i], 1);
   }
-  M5.Display.setTextDatum(top_left);
+  bar.setTextDatum(top_left);
+  DisplayLock lock("drawFooter");
+  bar.pushSprite(0, kFooterTop);
 }

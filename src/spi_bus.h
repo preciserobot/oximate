@@ -12,16 +12,23 @@ namespace SpiBus
 {
 void begin(); ///< create the mutex; call in setup() before starting the MIDI task
 bool tryLock();
-void lock();
+void lock(const char *holder = "?");
 void unlock();
+/*! Longest time the UI held the bus since the last reset, and who held it */
+uint32_t maxHoldMicros();
+const char *maxHolder();
+void resetStats();
 } // namespace SpiBus
 #else
 namespace SpiBus
 {
 inline void begin() {}
 inline bool tryLock() { return true; }
-inline void lock() {}
+inline void lock(const char * = "?") {}
 inline void unlock() {}
+inline uint32_t maxHoldMicros() { return 0; }
+inline const char *maxHolder() { return ""; }
+inline void resetStats() {}
 } // namespace SpiBus
 #endif
 
@@ -29,6 +36,6 @@ inline void unlock() {}
 class SpiLock
 {
 public:
-  SpiLock() { SpiBus::lock(); }
+  explicit SpiLock(const char *holder = "?") { SpiBus::lock(holder); }
   ~SpiLock() { SpiBus::unlock(); }
 };

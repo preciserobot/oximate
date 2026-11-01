@@ -249,8 +249,7 @@ void SynthPage::browserTouch(int x, int y)
 
 void SynthPage::draw()
 {
-  DisplayLock lock;
-  M5.Display.fillRect(0, kContentTop, M5.Display.width(), kContentHeight, TFT_BLACK);
+  canvas().fillRect(0, kContentTop, canvas().width(), kContentHeight, TFT_BLACK);
   if (_browsing) {
     drawBrowser();
   } else {
@@ -259,12 +258,13 @@ void SynthPage::draw()
 }
 
 /*! A table cell: inverted when selected */
-static void cell(int x, int y, int w, int h, const char *text, bool selected, uint16_t color = TFT_WHITE)
+static void cell(LovyanGFX &target, int x, int y, int w, int h, const char *text, bool selected,
+                 uint16_t color = TFT_WHITE)
 {
-  if (selected) M5.Display.fillRect(x, y, w, h, color);
-  M5.Display.setTextColor(selected ? TFT_BLACK : color, selected ? color : TFT_BLACK);
-  M5.Display.setCursor(x + 2, y + (h - kCharHeight) / 2);
-  M5.Display.print(text);
+  if (selected) target.fillRect(x, y, w, h, color);
+  target.setTextColor(selected ? TFT_BLACK : color, selected ? color : TFT_BLACK);
+  target.setCursor(x + 2, y + (h - kCharHeight) / 2);
+  target.print(text);
 }
 
 void SynthPage::drawMain()
@@ -274,32 +274,32 @@ void SynthPage::drawMain()
   char text[40];
 
   snprintf(text, sizeof(text), "Mode %s", kListenNames[(int)c.listen]);
-  drawChip(kTopColX[0], kTopY, kTopColW[0], kTopH, text, c.listen == SynthListen::Layers);
+  drawChip(canvas(), kTopColX[0], kTopY, kTopColW[0], kTopH, text, c.listen == SynthListen::Layers);
   snprintf(text, sizeof(text), "Cfg %u", c.configChannel);
-  drawChip(kTopColX[1], kTopY, kTopColW[1], kTopH, text, isSelected(0, 1));
-  drawChip(kTopColX[2], kTopY, kTopColW[2], kTopH, kVoicesNames[(int)c.voices], c.voices != SynthVoices::Dry);
+  drawChip(canvas(), kTopColX[1], kTopY, kTopColW[1], kTopH, text, isSelected(0, 1));
+  drawChip(canvas(), kTopColX[2], kTopY, kTopColW[2], kTopH, kVoicesNames[(int)c.voices], c.voices != SynthVoices::Dry);
 
   bool layers = c.listen == SynthListen::Layers;
-  M5.Display.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  M5.Display.setCursor(0, kTableHeaderY);
-  M5.Display.print(layers ? " # Chan Instrument          Vol Rev" : " Layers apply in Mode Layers");
+  canvas().setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  canvas().setCursor(0, kTableHeaderY);
+  canvas().print(layers ? " # Chan Instrument          Vol Rev" : " Layers apply in Mode Layers");
 
   for (int layer = 0; layer < SamSynth::kLayers; layer++) {
     const SynthLayer &l = c.layers[layer];
     int y = kLayerY + layer * kLayerH;
     int row = layer + 1;
     uint16_t color = layers && l.channel ? TFT_WHITE : TFT_DARKGREY;
-    cell(kLayerColX[0], y, 24, kLayerH, kLayerLabels[layer], false, TFT_LIGHTGREY);
+    cell(canvas(), kLayerColX[0], y, 24, kLayerH, kLayerLabels[layer], false, TFT_LIGHTGREY);
     if (l.channel) snprintf(text, sizeof(text), "ch%u", l.channel);
     else strcpy(text, "off");
-    cell(kLayerColX[1], y, kLayerColW[0], kLayerH, text, isSelected(row, 0), color);
+    cell(canvas(), kLayerColX[1], y, kLayerColW[0], kLayerH, text, isSelected(row, 0), color);
     instrumentText(l, layer == SamSynth::kDrumLayer, text, sizeof(text));
     text[21] = '\0'; // fits the column
-    cell(kLayerColX[2], y, kLayerColW[1], kLayerH, text, isSelected(row, 1), color);
+    cell(canvas(), kLayerColX[2], y, kLayerColW[1], kLayerH, text, isSelected(row, 1), color);
     snprintf(text, sizeof(text), "%3u", l.volume);
-    cell(kLayerColX[3], y, kLayerColW[2], kLayerH, text, isSelected(row, 2), color);
+    cell(canvas(), kLayerColX[3], y, kLayerColW[2], kLayerH, text, isSelected(row, 2), color);
     snprintf(text, sizeof(text), "%3u", l.reverb);
-    cell(kLayerColX[4], y, kLayerColW[3], kLayerH, text, isSelected(row, 3), color);
+    cell(canvas(), kLayerColX[4], y, kLayerColW[3], kLayerH, text, isSelected(row, 3), color);
   }
 
   const char *globals[4];
@@ -313,23 +313,23 @@ void SynthPage::drawMain()
   globals[2] = level;
   globals[3] = chorus;
   for (int i = 0; i < 4; i++) {
-    drawChip(i * 80, kGlobalY, 80, kGlobalH, globals[i], isSelected(6, i));
+    drawChip(canvas(), i * 80, kGlobalY, 80, kGlobalH, globals[i], isSelected(6, i));
   }
 
-  drawChip(0, kWiringY, kWiringW, kWiringH, c.bypass ? "Bypass" : "Separate", true);
-  drawChip(kWiringW, kWiringY, kWiringW, kWiringH, c.speaker ? "Out:Speaker" : "Out:Chip", c.speaker);
-  drawChip(2 * kWiringW, kWiringY, kWiringW, kWiringH, "Resend", true);
-  M5.Display.setFont(&fonts::Font0);
+  drawChip(canvas(), 0, kWiringY, kWiringW, kWiringH, c.bypass ? "Bypass" : "Separate", true);
+  drawChip(canvas(), kWiringW, kWiringY, kWiringW, kWiringH, c.speaker ? "Out:Speaker" : "Out:Chip", c.speaker);
+  drawChip(canvas(), 2 * kWiringW, kWiringY, kWiringW, kWiringH, "Resend", true);
+  canvas().setFont(&fonts::Font0);
   if (c.speaker) {
-    M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
-    M5.Display.drawString("Built-in speaker plays the layers; chip silent", 2, kWarningY);
+    canvas().setTextColor(TFT_CYAN, TFT_BLACK);
+    canvas().drawString("Built-in speaker plays the layers; chip silent", 2, kWarningY);
   } else if (!c.bypass) {
     // Decided 2026-11-01: warn that synth settings reach DIN gear (Elektrons switch patterns on PC)
-    M5.Display.setTextColor(TFT_ORANGE, TFT_BLACK);
+    canvas().setTextColor(TFT_ORANGE, TFT_BLACK);
     snprintf(text, sizeof(text), "Settings send PC/CC on ch%u to DIN gear too!", c.configChannel);
-    M5.Display.drawString(text, 2, kWarningY);
+    canvas().drawString(text, 2, kWarningY);
   }
-  M5.Display.setFont(&fonts::AsciiFont8x16);
+  canvas().setFont(&fonts::AsciiFont8x16);
 }
 
 void SynthPage::drawBrowser()
@@ -341,12 +341,12 @@ void SynthPage::drawBrowser()
       bool current = GmNames::kKits[k].program == _browseProgram;
       snprintf(text, sizeof(text), "%c%03u %s", current ? '>' : ' ', GmNames::kKits[k].program + 1,
                GmNames::kKits[k].name);
-      cell(0, kListY - 2 * kListH + k * kListH, 320, kListH, text, current);
+      cell(canvas(), 0, kListY - 2 * kListH + k * kListH, 320, kListH, text, current);
     }
     return;
   }
   for (int f = 0; f < 16; f++) {
-    drawChip((f % 8) * kFamilyW, kFamilyY + (f / 8) * kFamilyH, kFamilyW, kFamilyH, GmNames::kFamilies[f],
+    drawChip(canvas(), (f % 8) * kFamilyW, kFamilyY + (f / 8) * kFamilyH, kFamilyW, kFamilyH, GmNames::kFamilies[f],
              f == _browseFamily);
   }
   for (int i = 0; i < 8; i++) {
@@ -357,6 +357,6 @@ void SynthPage::drawBrowser()
     } else {
       snprintf(text, sizeof(text), "%c%03u %s", current ? '>' : ' ', program + 1, GmNames::kPrograms[program]);
     }
-    cell(0, kListY + i * kListH, 320, kListH, text, current);
+    cell(canvas(), 0, kListY + i * kListH, 320, kListH, text, current);
   }
 }

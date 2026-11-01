@@ -113,7 +113,7 @@ void setup()
   Ui::splash("USB host");
   bool usbOk;
   {
-    SpiLock bus;
+    SpiLock bus("usb init");
     usbOk = usbMidi.begin(onMidi);
   }
   if (!usbOk) {
@@ -145,8 +145,13 @@ void logDinStatus()
   if (millis() - last < 2000) return;
   last = millis();
   const DinMidi::Counters &c = dinMidi.counters();
-  Serial.printf("DIN rx %lu bytes, tx %lu bytes, dropped %lu | USB %s\n", (unsigned long)c.rxBytes,
-                (unsigned long)c.txBytes, (unsigned long)c.txDropped, usbMidi.connected() ? "connected" : "--");
+  Serial.printf("DIN rx %lu bytes, tx %lu bytes, dropped %lu | USB %s, gap max %lu ms | bus held max %lu ms (%s)\n",
+                (unsigned long)c.rxBytes, (unsigned long)c.txBytes, (unsigned long)c.txDropped,
+                usbMidi.connected() ? "connected" : "--", (unsigned long)(usbMidi.counters().maxGapMicros / 1000),
+                (unsigned long)(SpiBus::maxHoldMicros() / 1000), SpiBus::maxHolder());
+  // Maxima per 2 s window (the Diag page shows the same window)
+  usbMidi.resetGap();
+  SpiBus::resetStats();
 }
 
 /*! Built-in speaker output (stage 6): plays what the synth chip would play, from the routed

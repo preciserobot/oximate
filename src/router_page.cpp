@@ -20,12 +20,12 @@ static constexpr int kOptionChipWidth = 320 / 4;
 static const char *const kLedLevels[] = {"LEDs:off", "LEDs:low", "LEDs:med", "LEDs:high"};
 static const char *const kClockNames[] = {"Clk INT", "Clk USB", "Clk DIN"};
 
-static void drawChannelGrid(int y, uint16_t mask, uint16_t color)
+static void drawChannelGrid(LovyanGFX &target, int y, uint16_t mask, uint16_t color)
 {
   char text[3];
   for (int ch = 0; ch < 16; ch++) {
     snprintf(text, sizeof(text), "%d", ch + 1);
-    drawChip((ch % 8) * kGridCellWidth, y + (ch / 8) * kGridCellHeight, kGridCellWidth, kGridCellHeight, text,
+    drawChip(target, (ch % 8) * kGridCellWidth, y + (ch / 8) * kGridCellHeight, kGridCellWidth, kGridCellHeight, text,
              mask & (1 << ch), color);
   }
 }
@@ -42,31 +42,30 @@ static void forceChannelText(const char *input, uint8_t force, char *out, size_t
 void RouterPage::draw()
 {
   const RouterConfig &c = _router.config();
-  DisplayLock lock;
-  M5.Display.fillRect(0, kContentTop, M5.Display.width(), kContentHeight, TFT_BLACK);
+  canvas().fillRect(0, kContentTop, canvas().width(), kContentHeight, TFT_BLACK);
 
-  drawChip(0 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "USB>DIN", c.usbToDin);
-  drawChip(1 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>DIN", c.dinToDin);
-  drawChip(2 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>USB", c.dinToUsb);
+  drawChip(canvas(), 0 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "USB>DIN", c.usbToDin);
+  drawChip(canvas(), 1 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>DIN", c.dinToDin);
+  drawChip(canvas(), 2 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>USB", c.dinToUsb);
 
-  M5.Display.setTextColor(kUsbColor);
-  M5.Display.drawString("USB in channels", 4, kUsbLabelY);
-  drawChannelGrid(kUsbGridY, c.channelMask[(int)MidiSource::Usb], kUsbColor);
+  canvas().setTextColor(kUsbColor);
+  canvas().drawString("USB in channels", 4, kUsbLabelY);
+  drawChannelGrid(canvas(), kUsbGridY, c.channelMask[(int)MidiSource::Usb], kUsbColor);
 
-  M5.Display.setTextColor(kDinColor);
-  M5.Display.drawString("DIN in channels", 4, kDinLabelY);
-  drawChannelGrid(kDinGridY, c.channelMask[(int)MidiSource::Din], kDinColor);
+  canvas().setTextColor(kDinColor);
+  canvas().drawString("DIN in channels", 4, kDinLabelY);
+  drawChannelGrid(canvas(), kDinGridY, c.channelMask[(int)MidiSource::Din], kDinColor);
 
   char usbForce[10], dinForce[10];
   forceChannelText("USB", c.forceChannel[(int)MidiSource::Usb], usbForce, sizeof(usbForce));
   forceChannelText("DIN", c.forceChannel[(int)MidiSource::Din], dinForce, sizeof(dinForce));
-  drawChip(0 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, kClockNames[(int)_clock.config().mode],
+  drawChip(canvas(), 0 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, kClockNames[(int)_clock.config().mode],
            true);
-  drawChip(1 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, c.sysex ? "SysEx on" : "SysEx off",
+  drawChip(canvas(), 1 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, c.sysex ? "SysEx on" : "SysEx off",
            c.sysex);
-  drawChip(2 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, usbForce,
+  drawChip(canvas(), 2 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, usbForce,
            c.forceChannel[(int)MidiSource::Usb]);
-  drawChip(3 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, dinForce,
+  drawChip(canvas(), 3 * kOptionChipWidth, kOptionsY, kOptionChipWidth, kChipHeight, dinForce,
            c.forceChannel[(int)MidiSource::Din]);
 }
 

@@ -22,6 +22,7 @@ void DiagPage::onButton(int index)
     case 0:
       _stats.requestReset();
       _usb.resetGap();
+      SpiBus::resetStats();
       _loopMax = _loopMaxShown = 0;
       break;
     case 1:
@@ -87,17 +88,16 @@ void DiagPage::line(int row, const char *text, uint16_t color)
 {
   char padded[41];
   snprintf(padded, sizeof(padded), "%-40s", text);
-  M5.Display.setTextColor(color, TFT_BLACK);
-  M5.Display.setCursor(0, kContentTop + 2 + row * kCharHeight);
-  M5.Display.print(padded);
+  canvas().setTextColor(color, TFT_BLACK);
+  canvas().setCursor(0, kContentTop + 2 + row * kCharHeight);
+  canvas().print(padded);
 }
 
 void DiagPage::draw()
 {
-  DisplayLock lock;
   if (_clearAll) {
     _clearAll = false;
-    M5.Display.fillRect(0, kContentTop, M5.Display.width(), kContentHeight, TFT_BLACK);
+    canvas().fillRect(0, kContentTop, canvas().width(), kContentHeight, TFT_BLACK);
   }
   switch (_view) {
     case Channels: drawChannels(); break;
@@ -114,15 +114,15 @@ void DiagPage::drawChannels()
   static const uint16_t kColors[] = {kUsbColor, kDinColor};
   for (int input = 0; input < 2; input++) {
     int y = kContentTop + 2 + (1 + input) * kCharHeight;
-    M5.Display.setTextColor(kColors[input], TFT_BLACK);
-    M5.Display.setCursor(0, y);
-    M5.Display.print(kNames[input]);
+    canvas().setTextColor(kColors[input], TFT_BLACK);
+    canvas().setCursor(0, y);
+    canvas().print(kNames[input]);
     for (int ch = 0; ch < 16; ch++) {
       uint32_t seen = _stats.lastSeen(input, ch);
       bool active = seen && now - seen < kActiveMillis;
-      M5.Display.setTextColor(active ? kColors[input] : TFT_DARKGREY, TFT_BLACK);
-      M5.Display.setCursor((5 + ch * 2) * kCharWidth, y);
-      M5.Display.print(active ? "#" : ".");
+      canvas().setTextColor(active ? kColors[input] : TFT_DARKGREY, TFT_BLACK);
+      canvas().setCursor((5 + ch * 2) * kCharWidth, y);
+      canvas().print(active ? "#" : ".");
     }
   }
 
@@ -185,14 +185,17 @@ void DiagPage::drawSystem()
   // Longest wait between two USB reads: how long the display kept the shared SPI bus
   unsigned long gap = _usb.counters().maxGapMicros / 1000;
   if (_usb.connected()) {
-    snprintf(text, sizeof(text), " USB %04X:%04X gap max %lu ms", _usb.vendorId(), _usb.productId(), gap);
+    snprintf(text, sizeof(text), " USB %04X:%04X gap %lu ms/2s", _usb.vendorId(), _usb.productId(), gap);
   } else {
-    snprintf(text, sizeof(text), " USB --  gap max %lu ms  drop %lu", gap, (unsigned long)_usb.counters().txDropped);
+    snprintf(text, sizeof(text), " USB --  gap %lu ms/2s  drop %lu", gap, (unsigned long)_usb.counters().txDropped);
   }
   line(5, text);
   snprintf(text, sizeof(text), " UI drop %lu  loop echoes %lu", (unsigned long)_eventsDropped,
            (unsigned long)_outputs.counters().echoesBlocked);
   line(6, text);
+  snprintf(text, sizeof(text), " Bus held %lu ms/2s (%s)", (unsigned long)(SpiBus::maxHoldMicros() / 1000),
+           SpiBus::maxHolder());
+  line(8, text);
   snprintf(text, sizeof(text), " UI loop   avg %lu us  max %lu us", (unsigned long)_loopAvgShown,
            (unsigned long)_loopMaxShown);
   line(7, text);

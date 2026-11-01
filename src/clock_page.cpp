@@ -166,14 +166,13 @@ void ClockPage::leave()
 void ClockPage::draw()
 {
   _shown = _clock.snapshot();
-  DisplayLock lock;
   if (_partial && !_outputsView) {
     _partial = false;
     drawDynamic(); // digits and position only: no flicker on every beat
     return;
   }
   _partial = false;
-  M5.Display.fillRect(0, kContentTop, M5.Display.width(), kContentHeight, TFT_BLACK);
+  canvas().fillRect(0, kContentTop, canvas().width(), kContentHeight, TFT_BLACK);
   if (_outputsView) {
     drawOutputs();
   } else {
@@ -197,27 +196,27 @@ void ClockPage::drawDynamic()
     snprintf(digits, sizeof(digits), "%.1f", snap.bpm);
     if (!internal) color = snap.locked ? TFT_CYAN : TFT_YELLOW;
   }
-  M5.Display.fillRect(0, kDigitsY, 320, 50, TFT_BLACK);
-  M5.Display.setFont(&fonts::Font7);
-  M5.Display.setTextColor(color);
-  M5.Display.setTextDatum(top_right);
-  M5.Display.drawString(digits, 240, kDigitsY);
-  M5.Display.setFont(&fonts::AsciiFont8x16);
-  M5.Display.setTextDatum(top_left);
-  M5.Display.drawString(snap.lost && !internal ? "LOST" : "BPM", 250, kDigitsY + 30);
+  canvas().fillRect(0, kDigitsY, 320, 50, TFT_BLACK);
+  canvas().setFont(&fonts::Font7);
+  canvas().setTextColor(color);
+  canvas().setTextDatum(top_right);
+  canvas().drawString(digits, 240, kDigitsY);
+  canvas().setFont(&fonts::AsciiFont8x16);
+  canvas().setTextDatum(top_left);
+  canvas().drawString(snap.lost && !internal ? "LOST" : "BPM", 250, kDigitsY + 30);
 
   // Position and beat dots
-  M5.Display.fillRect(0, kPositionY, 320, 18, TFT_BLACK);
+  canvas().fillRect(0, kPositionY, 320, 18, TFT_BLACK);
   char position[32];
   snprintf(position, sizeof(position), "Bar %04u  Beat %u/%u", snap.bar + 1, snap.beat + 1, snap.beatsPerBar);
-  M5.Display.setTextColor(snap.running ? TFT_WHITE : TFT_DARKGREY);
-  M5.Display.drawString(position, 4, kPositionY);
+  canvas().setTextColor(snap.running ? TFT_WHITE : TFT_DARKGREY);
+  canvas().drawString(position, 4, kPositionY);
   for (int b = 0; b < snap.beatsPerBar; b++) {
     int cx = 210 + b * 15;
     if (b == snap.beat && snap.running) {
-      M5.Display.fillCircle(cx, kPositionY + 7, 5, b == 0 ? TFT_ORANGE : TFT_WHITE);
+      canvas().fillCircle(cx, kPositionY + 7, 5, b == 0 ? TFT_ORANGE : TFT_WHITE);
     } else {
-      M5.Display.drawCircle(cx, kPositionY + 7, 5, TFT_DARKGREY);
+      canvas().drawCircle(cx, kPositionY + 7, 5, TFT_DARKGREY);
     }
   }
 }
@@ -230,48 +229,48 @@ void ClockPage::drawMain()
 
   drawDynamic();
   for (int m = 0; m < 3; m++) {
-    drawChip(m * kThird, kSourceY, kThird, kChipHeight, kModeNames[m], (int)c.mode == m);
+    drawChip(canvas(), m * kThird, kSourceY, kThird, kChipHeight, kModeNames[m], (int)c.mode == m);
   }
 
   static const char *const kBpmSteps[] = {"-1", "-0.1", "+0.1", "+1"};
   for (int i = 0; i < 4; i++) {
-    drawChip(i * kQuarter, kBpmY, kQuarter, kChipHeight, kBpmSteps[i], internal);
+    drawChip(canvas(), i * kQuarter, kBpmY, kQuarter, kChipHeight, kBpmSteps[i], internal);
   }
 
   char swing[12], grid[12];
   snprintf(swing, sizeof(swing), "Sw %u%%", c.swing);
   snprintf(grid, sizeof(grid), "Grid 1/%u", c.swingGrid);
-  drawChip(0 * kQuarter, kSwingY, kQuarter, kChipHeight, "Swing-", true);
-  drawChip(1 * kQuarter, kSwingY, kQuarter, kChipHeight, swing, c.swing > 50);
-  drawChip(2 * kQuarter, kSwingY, kQuarter, kChipHeight, "Swing+", true);
-  drawChip(3 * kQuarter, kSwingY, kQuarter, kChipHeight, grid, true);
+  drawChip(canvas(), 0 * kQuarter, kSwingY, kQuarter, kChipHeight, "Swing-", true);
+  drawChip(canvas(), 1 * kQuarter, kSwingY, kQuarter, kChipHeight, swing, c.swing > 50);
+  drawChip(canvas(), 2 * kQuarter, kSwingY, kQuarter, kChipHeight, "Swing+", true);
+  drawChip(canvas(), 3 * kQuarter, kSwingY, kQuarter, kChipHeight, grid, true);
 
-  drawChip(0, kExtraY, 160, kChipHeight, c.imuTap ? "IMU tap on" : "IMU tap off", c.imuTap);
-  drawChip(160, kExtraY, 160, kChipHeight, "Rewind", !snap.running);
+  drawChip(canvas(), 0, kExtraY, 160, kChipHeight, c.imuTap ? "IMU tap on" : "IMU tap off", c.imuTap);
+  drawChip(canvas(), 160, kExtraY, 160, kChipHeight, "Rewind", !snap.running);
 }
 
 void ClockPage::drawOutputs()
 {
   const ClockConfig &c = _clock.config();
-  M5.Display.setTextColor(TFT_LIGHTGREY);
-  M5.Display.drawString("Output   Clock   Transport  Ratio", 4, kOutputsHeaderY);
+  canvas().setTextColor(TFT_LIGHTGREY);
+  canvas().drawString("Output   Clock   Transport  Ratio", 4, kOutputsHeaderY);
   static const char *const kNames[] = {"DIN OUT", "USB"};
   for (int o = 0; o < 2; o++) {
     const ClockOutputConfig &output = c.outputs[o];
     int y = kOutputRowY[o];
-    M5.Display.setTextColor(o == 0 ? kDinColor : kUsbColor);
-    M5.Display.drawString(kNames[o], 4, y + 5);
+    canvas().setTextColor(o == 0 ? kDinColor : kUsbColor);
+    canvas().drawString(kNames[o], 4, y + 5);
     char ratio[6];
     ratioText(output.ratio, ratio, sizeof(ratio));
-    drawChip(kClockChipX, y, kClockChipW, kChipHeight, output.enabled ? "on" : "off", output.enabled);
-    drawChip(kTransportChipX, y, kTransportChipW, kChipHeight, output.transport ? "on" : "off", output.transport);
-    drawChip(kRatioChipX, y, kRatioChipW, kChipHeight, ratio, output.ratio != 1);
+    drawChip(canvas(), kClockChipX, y, kClockChipW, kChipHeight, output.enabled ? "on" : "off", output.enabled);
+    drawChip(canvas(), kTransportChipX, y, kTransportChipW, kChipHeight, output.transport ? "on" : "off", output.transport);
+    drawChip(canvas(), kRatioChipX, y, kRatioChipW, kChipHeight, ratio, output.ratio != 1);
   }
   char beats[4];
   snprintf(beats, sizeof(beats), "%u", c.beatsPerBar);
-  M5.Display.setTextColor(TFT_WHITE);
-  M5.Display.drawString("Beats per bar", 4, kBeatsY + 5);
-  drawChip(160, kBeatsY, 80, kChipHeight, beats, true);
+  canvas().setTextColor(TFT_WHITE);
+  canvas().drawString("Beats per bar", 4, kBeatsY + 5);
+  drawChip(canvas(), 160, kBeatsY, 80, kChipHeight, beats, true);
 }
 
 void ClockPage::tick()
