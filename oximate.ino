@@ -84,11 +84,9 @@ void setup()
   uint32_t splashStart = millis();
   Ui::splash("starting");
 
-  // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2). The Unit MIDI's output line
-  // ends up on the pin M5Unified calls port_c_txd (GPIO 14) and its input on port_c_rxd
-  // (GPIO 13), so the names are crossed here. Verified on hardware 2026-11-01: the other
-  // way round, receive sees only noise and nothing reaches DIN OUT.
-  dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_txd), M5.getPin(m5::pin_name_t::port_c_rxd), onMidi);
+  // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2), pins as M5Unified names them
+  // (RX GPIO 13, TX GPIO 14), as in M5Stack's Unit MIDI example
+  dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
   outputs.begin(dinMidi, usbMidi, noteTracker);
   clockEngine.begin(outputs);
   router.begin(outputs, clockEngine);

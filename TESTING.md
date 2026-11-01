@@ -2,9 +2,10 @@
 
 Firmware: `develop` (stages 1, 2, 8 and 16), 2026-11-01.
 
-> Update: DIN didn't work at first because the receive and transmit pins were
-> crossed. That's fixed; please re-test the DIN items. Swipes now need to be
-> longer (about half the screen width).
+> Update: the DIN "noise" seen at first was probably the Oxi sending Oxi Split
+> data. Pins are back to the original order (RX 13 / TX 14). Re-test the DIN
+> items with the Oxi set to normal MIDI out. Swipes now need to be longer
+> (about half the screen width).
 
 How to use this file:
 
