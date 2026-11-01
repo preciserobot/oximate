@@ -38,6 +38,7 @@ synth.
 | 18 | [Network MIDI](#stage-18-network-midi) | — | idea |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | idea |
 | 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | idea |
+| 21 | [Chord detector](#stage-21-chord-detector) | — | planned (full plan) |
 
 Details for each stage are in [Stages](#stages).
 
@@ -195,6 +196,8 @@ piece is built by the first stage that needs it.
 | `ClockEngine` | 8 | the only source of outgoing clock and transport |
 | `SamSynth` | 6 | the only code that talks to the SAM2695; stages claim parts |
 | `StepSequencer` | 4 | pattern/step core shared by the Push 2 sequencer and the drum machine |
+| `music_theory` | 7 / 21 | note names, chord tables and chord naming; created by whichever of stage 7 or 21 is built first; stage 21 adds the extended-chord matcher both use |
+| `ChordInput` | 21 | input observer in the MIDI task: the exact set of notes held at the inputs, published as a snapshot |
 
 ### Decisions (2026-11-01)
 
@@ -610,6 +613,29 @@ Sources:
 [Moog forum: DFAM voltages](https://forum.moogmusic.com/viewtopic.php?p=179088),
 [Moog forum: Run/Stop and ADV/CLK](https://forum.moogmusic.com/viewtopic.php?p=186955),
 [Mother-32 manual: clock input](https://www.manualslib.com/manual/988819/Moog-Mother-32.html?page=47).
+
+### Stage 21: Chord detector
+
+A page that names the chord being played into OxiMate, from a USB keyboard,
+the Oxi One, the M8 or an Elektron sequencer.
+
+* **Held notes:** a `ChordInput` observer in the MIDI task keeps the exact
+  set of notes held at the inputs (USB, DIN or both; all channels or one),
+  with optional sustain-pedal handling. It doesn't use the UI event ring,
+  which can drop events and leave a note shown as held.
+* **Naming:** shared `music_theory` (with stage 7), extended with 6, 9, 11,
+  13 and altered chords, a matcher that tolerates missing or extra notes,
+  inversions, slash chords, ranked alternatives, and an optional key
+  estimate.
+* **Strums and arpeggios:** a 40 ms settle time for strummed chords, and an
+  optional arpeggio window (250/500/1000 ms or 1 bar) that collects
+  arpeggiated notes into one chord.
+* **Page:** big chord name and inversion, the notes coloured by pitch class,
+  up to 2 alternatives, the last 4 chords, and the key estimate. A clear,
+  B hold display, C sharps/flats. The LEDs show the chord tones in their
+  pitch-class colours while the page is open.
+
+**Full plan:** [docs/stages/stage-21.md](docs/stages/stage-21.md)
 
 ## Build and upload
 
