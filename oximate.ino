@@ -32,6 +32,8 @@
 #include "src/diagnostics.h"
 #include "src/din_midi.h"
 #include "src/ear_page.h"
+#include "src/drum_machine.h"
+#include "src/drum_page.h"
 #include "src/input_observers.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
@@ -58,6 +60,7 @@ ClockEngine clockEngine; // runs in the MIDI task; settings and transport from t
 Panic panic;             // runs in the MIDI task; requested from the UI
 Stats stats;             // written by the MIDI task, read by the Diagnostics page
 SamSynth samSynth;       // runs in the MIDI task; settings from the Synth page
+DrumMachine drumMachine; // plays in the MIDI task on clock steps; edited on the Drums page
 
 // UI side: Arduino loop() (core 1)
 Leds leds;
@@ -66,6 +69,7 @@ Monitor monitor;
 RouterPage routerPage(router, leds, clockEngine);
 SpeakerSynth speakerSynth;
 SynthPage synthPage(samSynth, speakerSynth);
+DrumPage drumPage(drumMachine, clockEngine, leds);
 ClockPage clockPage(clockEngine, leds);
 EarPage earPage(samSynth, speakerSynth, leds); // stage 7: ear trainer + chord explorer
 ClockAnalyser clockAnalyser; // stage 9: fed by an input observer in the MIDI task
@@ -89,6 +93,7 @@ void midiTaskLoop(uint32_t nowMillis)
   router.applyPending(); // settings changed on the UI side, even without MIDI traffic
   panic.run(nowMillis);
   samSynth.run(nowMillis);
+  drumMachine.run(nowMillis);
   stats.run();
 }
 
@@ -108,6 +113,7 @@ void setup()
   clockEngine.begin(outputs);
   router.begin(outputs, clockEngine);
   samSynth.begin(outputs);
+  drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
   ClockSource oldClock;
   if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
     static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
@@ -138,6 +144,7 @@ void setup()
   ui.addPage(monitor);
   ui.addPage(routerPage);
   ui.addPage(synthPage);
+  ui.addPage(drumPage);
   ui.addPage(clockPage);
   ui.addPage(analyserPage);
   earPage.begin();
@@ -272,6 +279,12 @@ void loop()
   clockEngine.poll();
   samSynth.poll();
   earPage.poll();
+  drumMachine.poll();
+  // Drum hits also play on the built-in speaker when the Synth page's output is the speaker
+  uint8_t drumNote, drumVelocity;
+  while (drumMachine.takeHit(drumNote, drumVelocity)) {
+    if (samSynth.config().speaker) speakerSynth.noteOn(drumNote, drumVelocity, true);
+  }
   speakerSynth.update();
   diagPage.eventsDropped(MidiTask::events().dropped());
   uint32_t loopEnd = micros();

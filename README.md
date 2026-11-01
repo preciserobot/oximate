@@ -22,7 +22,7 @@ synth.
 | 2 | [Router + LEDs](#stage-2-router--leds) | ✅ | needs hardware test |
 | 3 | [Oxi One remote](#stage-3-oxi-one-remote) | — | planned (full plan) |
 | 4 | [Push 2 host](#stage-4-push-2-host) | — | planned (full plan) |
-| 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
+| 5 | [Drum machine](#stage-5-drum-machine) | ✅ | needs hardware test |
 | 6 | [Preview synth](#stage-6-preview-synth) | ✅ | needs hardware test |
 | 7 | [Ear trainer](#stage-7-ear-trainer) | ✅ | needs hardware test |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Clock → Analyse → Ear → Diag → Monitor.
+  Router → Synth → Drums → Clock → Analyse → Ear → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -122,6 +122,7 @@ the USB Host Module.
 | Monitor | Clear the log | Pause / resume | Show / hide clock messages |
 | Router | All channels on | LED brightness | Default settings |
 | Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
+| Drums | Play / Stop (following an external clock: Arm / Disarm) | Mute lane (hold: solo); Sound view: audition | Next view (Grid → Sound → Pattern) |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
@@ -401,6 +402,37 @@ channel 10.
 * Built on stage 4's `step_sequencer`; bank in NVS, banks as JSON on SD.
 * Drums always go to both SAM2695 and DIN OUT in Separate mode (wiring);
   Bypass mode is the documented "synth only" option.
+
+**Implemented (2026-11-01)**, with these differences from the plan:
+
+* **No separate `step_sequencer` module yet:** the pattern store and playback
+  live in `src/drum_machine.*`. Stage 4 can extract a shared core when it
+  needs one.
+* **32 steps** (two pages of 16 pads, "Pg 1/2" chip), as decided. Patterns are
+  1–32 steps long.
+* **Tapping a pad cycles off → on → accent → off** instead of hold-for-accent,
+  which the plan flagged as awkward on a 2" screen.
+* **Pad controller:** an `InputHooks` interceptor in the MIDI task. Notes on
+  the **pad channel** (default 10, set in the Sound view, "off" disables it)
+  whose note matches a lane's note play that lane straight away and are
+  consumed, so they aren't routed a second time. Other notes pass through
+  unchanged. With **Rec** on (Grid view) and the clock running, hits are
+  written into the playing pattern, quantised to the nearest step;
+  velocity ≥ 110 records an accent.
+* **One output channel** for all lanes (10); per-lane channels, the kit
+  program change, the choke pair, and SD banks (milestone M5) aren't built.
+  Choose the SAM2695 drum kit on the Synth page's drum layer.
+* **Saving:** the bank (8 lanes, 16 patterns, chain) is saved in NVS 2 s
+  after the last edit, but only while stopped. A flash write stalls both CPU
+  cores for a moment, which would disturb playback timing.
+* **Play/Stop:** with the internal clock, A starts and stops the clock engine.
+  When following an external clock, transport belongs to the master, so A
+  arms or disarms the drum machine instead.
+* **Built-in speaker:** when the Synth page's output is "Speaker", drum hits
+  are also played on the Core2's speaker (the chip is silent in that mode).
+* **LED bar** while the page is open: right strip = 16th within the beat plus
+  a hit flash; left strip = beat within the bar plus a marker for steps
+  17–32.
 
 **Full plan:** [docs/stages/stage-5.md](docs/stages/stage-5.md)
 
@@ -841,6 +873,9 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/leds.*`        | GO Bottom2 LED bar |
 | `src/sam_synth.*`  | SAM2695 control: part map, layers, effects, auditions, restore after resets |
 | `src/synth_page.*`  | the Synth page and instrument browser |
+| `src/drum_machine.*` | drum machine: patterns, playback on clock steps, pad controller input |
+| `src/drum_page.*`   | the Drums page (Grid, Sound and Pattern views) |
+| `src/drum_kits.h`   | GM percussion note names |
 | `src/gm_names.h`    | GM instrument names, families, drum kits |
 | `src/music_theory.*` | note names, intervals, chords, scales, chord matching (stages 7 and 21) |
 | `src/ear_trainer.*` | ear-trainer logic: questions, answers, levels, statistics |

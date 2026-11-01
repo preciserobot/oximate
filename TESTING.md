@@ -105,6 +105,28 @@ Separate, settings go out on channel 16 to DIN gear too.
 * [ ] Out:Speaker: the Core2's speaker plays the layer channels and the test chord; the chip is silent; switching back to Out:Chip restores the chip
   > Did any setting change reach the Elektron/Oxi on channel 16?
 
+## 7. Drum machine (stage 5)
+
+Headphones on the Unit MIDI (or Synth output on Speaker). The Drums page sits
+between Synth and Clock.
+
+- [ ] Drums page appears; tapping a lane chip selects it and plays its sound
+- [ ] Tapping pads cycles off → on → accent (white dot) → off
+- [ ] Play (A) with the internal clock: the pattern plays on the SAM2695 and DIN OUT; the playhead moves over the pads and the overview
+- [ ] Pg 1/2 shows steps 17–32; a 32-step pattern plays all of them
+- [ ] Mute (B) and solo (hold B) work
+- [ ] Swing (Clock page) is audible on the drums
+- [ ] Pattern view: tapping a slot while playing switches at the end of the current pattern; length − / + works
+- [ ] Chain: on, tap a few slots, they play in order; Chain: off clears it
+- [ ] Sound view: note − / + changes the lane's sound (auditions it); velocity and accent velocity
+- [ ] Following an external clock (Elektron on DIN): A arms / disarms; the drums follow the master's start and stop
+- [ ] Stop: no hanging notes on external gear
+- [ ] Pad controller on channel 10 (or set the pad channel in the Sound view): pads matching a lane play it
+- [ ] Rec on + playing: pad hits are recorded into the pattern; hard hits record accents
+- [ ] Patterns survive a power cycle (stop first: saving waits until stopped)
+- [ ] Synth output on Speaker: drums play on the Core2's speaker
+  > Timing: does the drum timing feel tight while the screen redraws and you tap pads?
+
 ## 8. Ear trainer (stage 7)
 
 Synth output on "Chip" (questions on the SAM2695, channel 15) unless noted.
