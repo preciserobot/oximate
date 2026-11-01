@@ -91,14 +91,16 @@ the USB Host Module.
 
 ## Controls
 
-* **Switch page:** tap the header bar at the top of the screen. The page name
-  with `>` on the left shows where you are: Monitor → Router → Clock →
-  Diag → Monitor.
+* **Switch page:** **swipe left or right** anywhere on the screen (left =
+  next page, right = previous), or tap the header bar at the top. The page
+  name with `>` on the left of the header shows where you are: Monitor →
+  Router → Clock → Diag → Monitor.
 * **Touch buttons A/B/C** (the three circles below the screen) belong to the
   current page; the bottom bar shows their labels. Holding a button for about
   0.5 s is a separate action on some pages.
 * **Power button** (left side): short press = **panic** (note-offs, all notes
-  off, Stop); hold about 1.5 s = **panic all** (also a note-off for every
+  off, Stop; the header shows PANIC and the LEDs flash red); hold about 1.5 s
+  = **panic all** (also a note-off for every
   note on every channel, about 2 s on DIN). Holding it for 6 s still powers
   the Core2 off.
 * **Reset button** (underneath): restarts the device.
@@ -119,7 +121,8 @@ These rules apply to every stage.
   background whichever page is shown. Later stages add pages, and a mode menu
   once there are more than a few.
 * **Buttons.**
-  * **Tap the header bar** (top of the screen) to switch to the next page.
+  * **Swipe left/right** anywhere, or **tap the header bar**, to switch page.
+    The 20-pixel header alone turned out to be too small a target.
   * **Touch buttons A/B/C always belong to the current page.** Each page shows
     their labels in the footer.
   * Navigation never takes a button away from a stage that needs it, such as

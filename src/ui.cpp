@@ -3,6 +3,8 @@
 using namespace Layout;
 
 static constexpr uint32_t kFrameMillis = 40;
+static constexpr int kHeaderTapHeight = kHeaderHeight + 4; // a little more than the bar: easier to hit
+static constexpr int kSwipeMin = 60;                       // pixels sideways for a page swipe
 
 void drawChip(int x, int y, int w, int h, const char *text, bool on, uint16_t onColor)
 {
@@ -81,9 +83,19 @@ void Ui::poll()
   page.tick();
 
   auto touch = M5.Touch.getDetail();
+  // Swipe left / right anywhere on the screen: next / previous page
+  if ((touch.wasFlicked() || touch.wasDragged()) && touch.base_y < kFooterTop) {
+    int dx = touch.distanceX(), dy = touch.distanceY();
+    if (abs(dx) >= kSwipeMin && abs(dx) > 2 * abs(dy)) {
+      show((_current + (dx < 0 ? 1 : _pageCount - 1)) % _pageCount);
+      Serial.printf("Page: %s\n", _pages[_current]->title());
+      return;
+    }
+  }
   if (touch.wasClicked() && touch.y < kFooterTop) {
-    if (touch.y < kHeaderHeight) {
+    if (touch.y < kHeaderTapHeight) {
       show((_current + 1) % _pageCount);
+      Serial.printf("Page: %s\n", _pages[_current]->title());
       return;
     }
     page.onTouch(touch.x, touch.y);

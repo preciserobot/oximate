@@ -125,26 +125,36 @@ void setup()
 }
 
 /*! Power button: short press = panic levels 1+2, ~1.5 s hold = level 3 (any page).
- *  Shows progress on the LED bar and PANIC in the header. */
+ *  Every press shows PANIC in the header and flashes the LED bar red; a long panic also
+ *  shows its progress there. */
 void handlePanic()
 {
+  static uint32_t requestedAt = 0;
+  uint8_t level = 0;
   if (M5.BtnPWR.wasClicked()) {
-    panic.request(2);
+    level = 2;
   } else if (M5.BtnPWR.wasHold()) {
-    panic.request(3);
+    level = 3;
   }
-  static bool wasActive = false;
+  if (level) {
+    panic.request(level);
+    requestedAt = millis();
+    ui.flash(level >= 3 ? "PANIC ALL" : "PANIC", TFT_RED, 1500);
+    Serial.printf("Panic level %u requested\n", level);
+  }
+
+  // Red while the panic runs, and at least 400 ms so a quick one is still visible
   Panic::Summary state = panic.summary();
-  if (state.active) {
+  bool recent = requestedAt && millis() - requestedAt < 400;
+  if (state.active || recent) {
     RGBColor bar[Leds::kCount];
-    int lit = (state.progress * Leds::kCount + 99) / 100;
+    int lit = state.active ? (state.progress * Leds::kCount + 99) / 100 : Leds::kCount;
     for (int i = 0; i < Leds::kCount; i++) bar[i] = i < lit ? RGBColor(255, 0, 0) : RGBColor(32, 0, 0);
     leds.setOverlay(bar);
-    if (!wasActive) ui.flash(state.level >= 3 ? "PANIC ALL" : "PANIC", TFT_RED, 1500);
-  } else if (wasActive) {
+  } else if (requestedAt) {
+    requestedAt = 0;
     leds.setOverlay(nullptr);
   }
-  wasActive = state.active;
 }
 
 void loop()
