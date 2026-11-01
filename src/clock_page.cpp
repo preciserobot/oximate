@@ -278,6 +278,12 @@ void ClockPage::tick()
 {
   ClockEngine::Snapshot snap = _clock.snapshot();
   renderLeds(snap);
+  // The Start/Stop label follows the real transport state: commands take effect in the MIDI
+  // task a moment after the button press, and a followed clock starts and stops on its own
+  if (snap.running != _labelRunning) {
+    _labelRunning = snap.running;
+    markFooterDirty();
+  }
 
   static uint32_t lastDraw = 0;
   if (_outputsView || millis() - lastDraw < kDynamicMillis) {

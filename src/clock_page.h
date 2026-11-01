@@ -41,6 +41,7 @@ private:
   bool _outputsView = false;
   bool _visible = false;
   bool _partial = false; // next draw() only updates digits and position
+  bool _labelRunning = false; // transport state shown on the A button
 
   // Last drawn values, to redraw the dynamic parts only when they change
   ClockEngine::Snapshot _shown = {};

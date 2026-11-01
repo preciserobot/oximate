@@ -110,6 +110,7 @@ void Ui::poll()
     }
   }
   page.tick();
+  if (page.takeFooterDirty()) _footerDirty = true;
 
   auto touch = M5.Touch.getDetail();
   // Swipe left / right anywhere on the screen: next / previous page

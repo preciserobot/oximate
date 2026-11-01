@@ -54,12 +54,21 @@ public:
 
   bool dirty() const { return _dirty; }
   void clean() { _dirty = false; }
+  /*! True once after markFooterDirty(): the button labels changed on their own */
+  bool takeFooterDirty()
+  {
+    bool dirty = _footerDirty;
+    _footerDirty = false;
+    return dirty;
+  }
 
 protected:
   void markDirty() { _dirty = true; }
+  void markFooterDirty() { _footerDirty = true; }
 
 private:
   bool _dirty = true;
+  bool _footerDirty = false;
 };
 
 /*! Owns page switching (tap the header), the header/footer bars and redraw throttling */
