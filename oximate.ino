@@ -24,6 +24,8 @@
  */
 #include <M5Unified.h>
 
+#include "src/analyser_page.h"
+#include "src/clock_analyser.h"
 #include "src/clock_engine.h"
 #include "src/clock_page.h"
 #include "src/diag_page.h"
@@ -66,6 +68,8 @@ SpeakerSynth speakerSynth;
 SynthPage synthPage(samSynth, speakerSynth);
 ClockPage clockPage(clockEngine, leds);
 EarPage earPage(samSynth, speakerSynth, leds); // stage 7: ear trainer + chord explorer
+ClockAnalyser clockAnalyser; // stage 9: fed by an input observer in the MIDI task
+AnalyserPage analyserPage(clockAnalyser, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
@@ -135,10 +139,12 @@ void setup()
   ui.addPage(routerPage);
   ui.addPage(synthPage);
   ui.addPage(clockPage);
+  ui.addPage(analyserPage);
   earPage.begin();
   ui.addPage(earPage);
   ui.addPage(diagPage);
 
+  InputHooks::addObserver(ClockAnalyser::observer, &clockAnalyser);
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
   MidiTask::start(usbMidi, dinMidi, clockEngine, outputs);
@@ -149,7 +155,7 @@ void setup()
 void logDinStatus()
 {
   static uint32_t last = 0;
-  if (millis() - last < 2000) return;
+  if (millis() - last < 2000 || clockAnalyser.csv()) return; // CSV streaming owns the serial port
   last = millis();
   const DinMidi::Counters &c = dinMidi.counters();
   Serial.printf("DIN rx %lu bytes, tx %lu bytes, dropped %lu | USB %s, gap max %lu ms | bus held max %lu ms (%s)\n",
@@ -272,5 +278,7 @@ void loop()
   diagPage.loopTime(loopEnd - loopStart);
   logSlowLoop(loopStart, eventsDone, inputDone, drawDone, loopEnd);
   logDinStatus();
+  analyserPage.pollCsv();
+  monitor.setSerialEcho(!clockAnalyser.csv());
   delay(1); // let the idle task run; the UI doesn't need more than ~1 kHz
 }
