@@ -79,4 +79,52 @@ ChordMatch matchNotes(const uint8_t *notes, int count);
 void chordName(uint8_t root, int quality, char *out, size_t size, bool flats = false);
 void chordName(const ChordMatch &match, char *out, size_t size, bool flats = false);
 const char *inversionName(int inversion); ///< "root", "1st", "2nd", "3rd", ...
+
+// ---------------------------------------------------------------------------------------------
+// Stage 21: extended chords and a scoring matcher (chord detector). Lead-sheet names ("Cm7",
+// "Cmaj7/E"), tolerant of missing optional tones and extra notes, ranked with alternatives.
+
+constexpr int kMaxExtendedTones = 7;
+
+struct ExtendedChord
+{
+  const char *suffix;                  ///< "" (major), "m", "maj7", "7sus4", "13b9", ...
+  uint8_t tones[kMaxExtendedTones];    ///< semitones above the root (mod 12), root first
+  uint8_t count;
+  uint16_t optional;                   ///< interval mask of tones that may be left out (5th, 9th under 11/13)
+};
+
+extern const ExtendedChord kExtendedChords[];
+extern const int kExtendedChordCount;
+
+struct ScoredChord
+{
+  uint8_t root;     ///< pitch class
+  uint8_t type;     ///< index into kExtendedChords
+  uint8_t bass;     ///< pitch class of the lowest note
+  int8_t inversion; ///< 0 = root position, 1 = 1st ...; -1 = no inversion label (bass not a chord tone, or extended chord)
+  int16_t score;
+};
+
+constexpr int kMinScore = 20;         ///< weaker readings are not named
+constexpr int kAlternativeWindow = 12; ///< alternatives must score within this of the best
+
+/*! Interval mask (bit n = n semitones above the root) of an extended chord type */
+uint16_t extendedMask(int type);
+/*! Score one reading of a pitch-class set (see docs/stages/stage-21.md "Detection algorithm") */
+int scoreChord(uint16_t pcs, uint8_t bass, uint8_t root, int type);
+/*! All readings scoring at least kMinScore, best first; returns how many were written */
+int detectChords(uint16_t pcs, uint8_t bass, ScoredChord *out, int maxOut);
+/*! Lead-sheet name: "C", "Cm7", "Cmaj7/E", "C5" */
+void leadSheetName(const ScoredChord &chord, char *out, size_t size, bool flats = false);
+
+/*! Krumhansl-Schmuckler key estimate from pitch-class weights */
+struct KeyEstimate
+{
+  bool found;
+  uint8_t tonic; ///< pitch class
+  bool minor;
+  float correlation; ///< -1..1; the page treats < 0.6 as uncertain
+};
+KeyEstimate estimateKey(const float weights[12]);
 } // namespace MusicTheory

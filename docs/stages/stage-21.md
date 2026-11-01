@@ -1,6 +1,7 @@
 # Stage 21: Chord detector
 
-> **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
+> **Status: implemented 2026-11-01** (see the README's stage 21 section for the differences). Originally:
+> **plan, not implemented.** Written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 > Shares `src/music_theory.*` with stage 7: whichever of the two is built first creates it.
 >
