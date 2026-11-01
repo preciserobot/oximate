@@ -86,6 +86,7 @@ void midiTaskLoop(uint32_t nowMillis)
 void setup()
 {
   M5.begin();
+  Serial.setTxBufferSize(4096); // the monitor prints every line; it must never block the UI
   Serial.begin(115200);
   SpiBus::begin();
   uint32_t splashStart = millis();
@@ -216,6 +217,18 @@ void handlePanic()
   }
 }
 
+/*! Logs which part of a slow UI loop took the time (at most once a second) */
+void logSlowLoop(uint32_t start, uint32_t events, uint32_t input, uint32_t drawn, uint32_t end)
+{
+  static uint32_t lastLog = 0;
+  if (end - start < 50000 || millis() - lastLog < 1000) return;
+  lastLog = millis();
+  Serial.printf("Slow UI loop %lu ms: events %lu, input %lu, draw %lu, rest %lu ms\n",
+                (unsigned long)((end - start) / 1000), (unsigned long)((events - start) / 1000),
+                (unsigned long)((input - events) / 1000), (unsigned long)((drawn - input) / 1000),
+                (unsigned long)((end - drawn) / 1000));
+}
+
 void loop()
 {
   uint32_t loopStart = micros();
@@ -227,10 +240,13 @@ void loop()
     monitor.log(msg, event.forwarded, event.length);
   }
 
+  uint32_t eventsDone = micros();
   M5.update();
   handlePanic();
   ui.setUsbDevice(usbMidi.connected(), usbMidi.vendorId(), usbMidi.productId());
+  uint32_t inputDone = micros();
   ui.poll();
+  uint32_t drawDone = micros();
   clockPage.pollImu();
   leds.update();
   router.poll();
@@ -238,7 +254,9 @@ void loop()
   samSynth.poll();
   speakerSynth.update();
   diagPage.eventsDropped(MidiTask::events().dropped());
-  diagPage.loopTime(micros() - loopStart);
+  uint32_t loopEnd = micros();
+  diagPage.loopTime(loopEnd - loopStart);
+  logSlowLoop(loopStart, eventsDone, inputDone, drawDone, loopEnd);
   logDinStatus();
   delay(1); // let the idle task run; the UI doesn't need more than ~1 kHz
 }

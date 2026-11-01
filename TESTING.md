@@ -64,12 +64,19 @@ are built on top; the rest can be checked along the way.
 
 ## 5. Diag page
 
-* [ ] Channel view shows activity; channels 1–10 light up on the LEDs
-* [ ] Counters go up while playing; A resets them
-* [ ] **MUST** System view while playing heavily:
-  > UI loop max:
-  > USB bus busy:
-  > UI events dropped:
+* [x] Channel view shows activity; channels 1–10 light up on the LEDs
+* [x] Counters go up while playing; A resets them
+* [x] **MUST** System view while playing heavily:
+  > UI loop max: ~300000us max, avg ~ 1000-2000us
+  > USB bus busy: ~27000 after 30s and increasing (input from DIN and USB)
+  > UI events dropped: 0
+>
+* On the diagnostic page, keys held via USB show in the DIN counter, and notes held via DIN show on both USB and DIN counters
+  > Correct behaviour, now labelled "Held at DIN OUT / USB OUT": it counts notes at the outputs.
+
+> Follow-up (2026-11-01): after the bus hand-off fix, please re-check while playing heavily:
+> USB gap max (Diag system view, "USB ... gap max"): ___ ms
+> UI loop max: ___ us
 
 ## 6. Synth page (stage 6)
 

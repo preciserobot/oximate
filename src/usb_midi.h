@@ -15,6 +15,7 @@ public:
   {
     uint32_t txDropped = 0; ///< messages that did not fit the send queue
     uint32_t busBusy = 0;   ///< polls skipped because the display held the SPI bus
+    uint32_t maxGapMicros = 0; ///< longest time between two completed polls (reset with resetGap())
   };
 
   bool begin(MidiHandler handler); ///< false if the MAX3421E does not respond
@@ -28,6 +29,7 @@ public:
   uint16_t productId() const { return _pid; }
 
   const Counters &counters() const { return _counters; }
+  void resetGap() { _counters.maxGapMicros = 0; }
 
 private:
   static constexpr size_t kTxQueueLength = 2048;
@@ -39,6 +41,7 @@ private:
 
   MidiHandler _handler = nullptr;
   Counters _counters;
+  uint32_t _lastPollMicros = 0;
   std::atomic<bool> _connected{false};
   std::atomic<uint16_t> _vid{0}, _pid{0};
 

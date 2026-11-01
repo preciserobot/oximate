@@ -21,6 +21,7 @@ void DiagPage::onButton(int index)
   switch (index) {
     case 0:
       _stats.requestReset();
+      _usb.resetGap();
       _loopMax = _loopMaxShown = 0;
       break;
     case 1:
@@ -127,9 +128,10 @@ void DiagPage::drawChannels()
 
   Panic::Summary panic = _panic.summary();
   char text[48];
-  snprintf(text, sizeof(text), " Held       DIN %-4u USB %u", panic.held[0], panic.held[1]);
+  // Counted at the outputs: a USB keyboard plays out of DIN OUT, DIN input goes to both
+  snprintf(text, sizeof(text), " Held at    DIN OUT %-4u USB OUT %u", panic.held[0], panic.held[1]);
   line(4, text);
-  snprintf(text, sizeof(text), " Sustain    DIN %-2u ch USB %u ch", panic.sustain[0], panic.sustain[1]);
+  snprintf(text, sizeof(text), " Pedal on   DIN OUT %-2u ch USB OUT %u ch", panic.sustain[0], panic.sustain[1]);
   line(5, text);
   snprintf(text, sizeof(text), " Released   %lu notes automatically", (unsigned long)panic.autoReleased);
   line(6, text);
@@ -180,12 +182,12 @@ void DiagPage::drawSystem()
   snprintf(text, sizeof(text), " DIN       rx %lu  tx %lu  drop %lu", (unsigned long)_din.counters().rxBytes,
            (unsigned long)_din.counters().txBytes, (unsigned long)_din.counters().txDropped);
   line(4, text);
+  // Longest wait between two USB reads: how long the display kept the shared SPI bus
+  unsigned long gap = _usb.counters().maxGapMicros / 1000;
   if (_usb.connected()) {
-    snprintf(text, sizeof(text), " USB %04X:%04X drop %lu busy %lu", _usb.vendorId(), _usb.productId(),
-             (unsigned long)_usb.counters().txDropped, (unsigned long)_usb.counters().busBusy);
+    snprintf(text, sizeof(text), " USB %04X:%04X gap max %lu ms", _usb.vendorId(), _usb.productId(), gap);
   } else {
-    snprintf(text, sizeof(text), " USB --  drop %lu  busy %lu", (unsigned long)_usb.counters().txDropped,
-             (unsigned long)_usb.counters().busBusy);
+    snprintf(text, sizeof(text), " USB --  gap max %lu ms  drop %lu", gap, (unsigned long)_usb.counters().txDropped);
   }
   line(5, text);
   snprintf(text, sizeof(text), " UI drop %lu  loop echoes %lu", (unsigned long)_eventsDropped,

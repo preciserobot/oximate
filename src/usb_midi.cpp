@@ -21,6 +21,11 @@ void UsbMidi::poll()
     _counters.busBusy++;
     return; // the display is drawing; try again on the next poll
   }
+  uint32_t now = micros();
+  if (_lastPollMicros && now - _lastPollMicros > _counters.maxGapMicros) {
+    _counters.maxGapMicros = now - _lastPollMicros;
+  }
+  _lastPollMicros = now;
   Usb.Task();
   bool connected = (bool)MidiDevice;
   if (connected != _connected) {
@@ -38,7 +43,7 @@ void UsbMidi::poll()
       if (MidiDevice.RecvData(&received, buf) != 0 || received == 0) {
         break;
       }
-      uint32_t now = micros();
+      now = micros();
       for (uint16_t i = 0; i + 4 <= received; i += 4) {
         if (buf[i] == 0 && buf[i + 1] == 0) {
           break; // padding: end of data

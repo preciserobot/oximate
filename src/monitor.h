@@ -19,7 +19,7 @@ public:
 
 private:
   static constexpr int kLines = 12; // visible log lines (8x16 font, 40 columns)
-  static constexpr int kBands = 4;  // pushed separately so the SPI bus is never held long
+  static constexpr int kBands = 6;  // pushed separately so the SPI bus is never held long
   static constexpr int kLinesPerBand = kLines / kBands;
   static constexpr int kLineLength = 41;
 
@@ -32,7 +32,7 @@ private:
   void addLine(uint16_t color, const char *text);
 
   M5Canvas _bands[kBands] = {M5Canvas(&M5.Display), M5Canvas(&M5.Display), M5Canvas(&M5.Display),
-                             M5Canvas(&M5.Display)};
+                             M5Canvas(&M5.Display), M5Canvas(&M5.Display), M5Canvas(&M5.Display)};
   Line _lines[kLines];
   int _head = 0; // index of the next line to write
   int _count = 0;

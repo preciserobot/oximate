@@ -2,7 +2,8 @@
 
 /*! The display, the USB host module (MAX3421E) and the SD card share one SPI bus
  *  through different drivers. Every user takes this lock around its bus access.
- *  The MIDI task only ever try-locks, so it never waits for a screen redraw. */
+ *  The MIDI task only ever try-locks, so it never waits for a screen redraw; when it finds the
+ *  bus busy, the next blocking lock() from the UI waits up to ~3 ms to let it go first. */
 #if defined(ESP_PLATFORM)
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
