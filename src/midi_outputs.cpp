@@ -16,6 +16,11 @@ bool MidiOutputs::available(MidiOutput out) const
   return out == MidiOutput::Din || _usb->connected();
 }
 
+bool MidiOutputs::hasSpace(MidiOutput out, uint16_t length) const
+{
+  return out == MidiOutput::Din ? _din->txSpace() >= length : _usb->txSpace() >= length + 3u;
+}
+
 void MidiOutputs::send(MidiOutput out, const MidiMessage &msg, Origin origin)
 {
   if (!available(out)) {

@@ -20,6 +20,7 @@ public:
   bool begin(MidiHandler handler); ///< false if the MAX3421E does not respond
   void poll();                      ///< run the USB stack, flush sends, read pending packets
   void send(const MidiMessage &msg);
+  size_t txSpace() const; ///< free bytes in the send queue (each message takes 3 extra)
 
   // Safe to call from any task
   bool connected() const { return _connected; }

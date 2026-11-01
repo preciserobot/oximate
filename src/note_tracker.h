@@ -34,6 +34,7 @@ public:
   void release(MidiOutputs &outputs, MidiOutput out, const Origin *only = nullptr);
 
   void clear(MidiOutput out); ///< forget without sending (e.g. the USB device is gone)
+  void forget(MidiOutput out, uint8_t channel, uint8_t note); ///< forget one note without sending
 
   /*! Oldest held note older than thresholdMillis */
   bool findStuck(uint32_t nowMillis, uint32_t thresholdMillis, MidiOutput &out, HeldNote &stuck) const;

@@ -26,12 +26,15 @@
 
 #include "src/clock_engine.h"
 #include "src/clock_page.h"
+#include "src/diag_page.h"
+#include "src/diagnostics.h"
 #include "src/din_midi.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
 #include "src/midi_task.h"
 #include "src/monitor.h"
 #include "src/note_tracker.h"
+#include "src/panic.h"
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/spi_bus.h"
@@ -45,6 +48,8 @@ NoteTracker noteTracker;
 MidiOutputs outputs;
 Router router;           // route() in the MIDI task; settings edited by the UI
 ClockEngine clockEngine; // runs in the MIDI task; settings and transport from the UI
+Panic panic;             // runs in the MIDI task; requested from the UI
+Stats stats;             // written by the MIDI task, read by the Diagnostics page
 
 // UI side: Arduino loop() (core 1)
 Leds leds;
@@ -52,12 +57,23 @@ Ui ui;
 Monitor monitor;
 RouterPage routerPage(router, leds, clockEngine);
 ClockPage clockPage(clockEngine, leds);
+DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
 void onMidi(const MidiMessage &msg)
 {
   bool forwarded = router.route(msg);
+  stats.observe(msg, forwarded, millis());
+  panic.observe(msg);
   MidiTask::events().push(msg, forwarded);
+}
+
+/*! Every MIDI task loop, after polling the inputs */
+void midiTaskLoop(uint32_t nowMillis)
+{
+  router.applyPending(); // settings changed on the UI side, even without MIDI traffic
+  panic.run(nowMillis);
+  stats.run();
 }
 
 void setup()
@@ -71,6 +87,7 @@ void setup()
   ui.addPage(monitor);
   ui.addPage(routerPage);
   ui.addPage(clockPage);
+  ui.addPage(diagPage);
 
   // Unit MIDI on Port C (blue Grove port of the M5GO Bottom2)
   dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
@@ -101,12 +118,38 @@ void setup()
     while (true) delay(1000);
   }
 
+  panic.begin(outputs, noteTracker, usbMidi, clockEngine);
+  MidiTask::setLoopHook(midiTaskLoop);
   MidiTask::start(usbMidi, dinMidi, clockEngine);
   Serial.println("OxiMate running");
 }
 
+/*! Power button: short press = panic levels 1+2, ~1.5 s hold = level 3 (any page).
+ *  Shows progress on the LED bar and PANIC in the header. */
+void handlePanic()
+{
+  if (M5.BtnPWR.wasClicked()) {
+    panic.request(2);
+  } else if (M5.BtnPWR.wasHold()) {
+    panic.request(3);
+  }
+  static bool wasActive = false;
+  Panic::Summary state = panic.summary();
+  if (state.active) {
+    RGBColor bar[Leds::kCount];
+    int lit = (state.progress * Leds::kCount + 99) / 100;
+    for (int i = 0; i < Leds::kCount; i++) bar[i] = i < lit ? RGBColor(255, 0, 0) : RGBColor(32, 0, 0);
+    leds.setOverlay(bar);
+    if (!wasActive) ui.flash(state.level >= 3 ? "PANIC ALL" : "PANIC", TFT_RED, 1500);
+  } else if (wasActive) {
+    leds.setOverlay(nullptr);
+  }
+  wasActive = state.active;
+}
+
 void loop()
 {
+  uint32_t loopStart = micros();
   MidiEvent event;
   while (MidiTask::events().pop(event)) {
     MidiMessage msg = event.message();
@@ -115,11 +158,14 @@ void loop()
   }
 
   M5.update();
+  handlePanic();
   ui.setUsbDevice(usbMidi.connected(), usbMidi.vendorId(), usbMidi.productId());
   ui.poll();
   clockPage.pollImu();
   leds.update();
   router.poll();
   clockEngine.poll();
+  diagPage.eventsDropped(MidiTask::events().dropped());
+  diagPage.loopTime(micros() - loopStart);
   delay(1); // let the idle task run; the UI doesn't need more than ~1 kHz
 }

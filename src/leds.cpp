@@ -91,6 +91,15 @@ void Leds::setPixel(uint8_t owner, int index, RGBColor color)
   }
 }
 
+void Leds::setOverlay(const RGBColor *colors)
+{
+  _overlayOn = colors != nullptr;
+  if (colors) {
+    for (int i = 0; i < kCount; i++) _overlay[i] = colors[i];
+  }
+  _lit = true;
+}
+
 void Leds::update()
 {
   uint32_t now = millis();
@@ -107,7 +116,10 @@ void Leds::update()
                    flash.color.B8() * flash.intensity);
     for (int i = 0; i < kPerSide; i++) {
       int index = side * kPerSide + i;
-      if (_owner[index]) {
+      if (_overlayOn) {
+        M5.Led.setColor(index, _overlay[index]);
+        claimed = true;
+      } else if (_owner[index]) {
         M5.Led.setColor(index, _pixel[index]);
         claimed = true;
       } else {

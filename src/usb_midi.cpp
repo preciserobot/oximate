@@ -72,6 +72,12 @@ void UsbMidi::send(const MidiMessage &msg)
   }
 }
 
+size_t UsbMidi::txSpace() const
+{
+  size_t used = (_txHead + kTxQueueLength - _txTail) % kTxQueueLength;
+  return kTxQueueLength - 1 - used;
+}
+
 /*! Send queued messages; called from poll() while holding the SPI bus */
 void UsbMidi::flushTx()
 {

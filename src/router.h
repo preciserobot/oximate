@@ -42,7 +42,8 @@ public:
   bool route(const MidiMessage &msg);
 
   RouterConfig &config() { return _edit; } ///< the UI's copy
-  void changed();       ///< apply config() to the MIDI task now; saved after a short delay
+  void changed();       ///< hand config() to the MIDI task; saved after a short delay
+  void applyPending();  ///< MIDI task: take over changed settings (route() also does this)
   void resetDefaults();
   void poll();          ///< performs delayed saves (UI)
 
@@ -52,11 +53,14 @@ public:
 private:
   static bool passes(const RouterConfig &config, const MidiMessage &msg);
   void apply();
+  static bool routingChanged(const RouterConfig &a, const RouterConfig &b, MidiSource input);
   void load();
   void save();
 
   RouterConfig _edit;   // edited by the UI
-  RouterConfig _active; // read by route(), replaced under _lock
+  RouterConfig _active; // used by route() in the MIDI task
+  RouterConfig _pending; // handed over under _lock
+  bool _pendingSet = false;
   CriticalSection _lock;
   MidiOutputs *_outputs = nullptr;
   ClockEngine *_clock = nullptr;

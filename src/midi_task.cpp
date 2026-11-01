@@ -38,6 +38,7 @@ bool EventRing::pop(MidiEvent &event)
 }
 
 #if defined(ESP_PLATFORM)
+#include <Arduino.h>
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -48,6 +49,7 @@ static DinMidi *gDin = nullptr;
 static ClockEngine *gClock = nullptr;
 static TaskHandle_t gTask = nullptr;
 static esp_timer_handle_t gTimer = nullptr;
+static void (*gHook)(uint32_t) = nullptr;
 
 /*! esp_timer callback: only wakes the MIDI task, which then runs the due work */
 static void onTimer(void *) { xTaskNotifyGive(gTask); }
@@ -67,6 +69,7 @@ static void run(void *)
     gClock->runDue(nowMicros64());
     gDin->poll();
     gUsb->poll();
+    if (gHook) gHook(millis());
     gDin->pumpTx();
   }
 }
@@ -82,6 +85,8 @@ void MidiTask::start(UsbMidi &usb, DinMidi &din, ClockEngine &clock)
   esp_timer_create(&args, &gTimer); // before the task: it arms the timer straight away
   xTaskCreatePinnedToCore(run, "midi", kStackBytes, nullptr, kPriority, &gTask, kCore);
 }
+
+void MidiTask::setLoopHook(void (*hook)(uint32_t)) { gHook = hook; }
 
 EventRing &MidiTask::events() { return gEvents; }
 #endif

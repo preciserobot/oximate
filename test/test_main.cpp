@@ -15,6 +15,7 @@
 #include "midi_outputs.h"
 #include "midi_task.h"
 #include "note_tracker.h"
+#include "panic.h"
 #include "router.h"
 #include "tap_tempo.h"
 #include "usb_midi.h"
@@ -248,7 +249,9 @@ static void testRouter()
 
   r.config().channelMask[0] &= ~(1 << 2);
   r.changed();
-  CHECK(!r.route(note) && rig.dinBytes().empty());
+  CHECK(!r.route(note));
+  // The note held from before is released when its channel gets blocked
+  CHECK(rig.dinBytes() == std::vector<uint8_t>({0x82, 60, 0}));
 
   r.config().channelMask[0] = 0xFFFF;
   r.config().forceChannel[0] = 10;
@@ -633,6 +636,85 @@ static void testRouterMigration()
   CHECK(clock.config().mode == ClockMode::FollowUsb);
 }
 
+static void testPanic()
+{
+  OutputRig rig;
+  gRunRig = &rig;
+  Panic panic;
+  panic.begin(rig.outputs, rig.tracker, rig.usb, rig.clock);
+  gFakeMillis = 1000;
+  auto run = [&](int loops) {
+    for (int i = 0; i < loops; i++) {
+      panic.run(gFakeMillis);
+      rig.serial.drain(128);
+      rig.din.pumpTx();
+    }
+  };
+
+  // Level 2: note-offs for held notes, Stop, then CC123/CC120/CC64 on all 16 channels
+  rig.router.route(msg(MidiSource::Usb, {0x90, 60, 100}));
+  rig.router.route(msg(MidiSource::Usb, {0x91, 62, 100}));
+  rig.dinBytes();
+  panic.request(2);
+  run(5);
+  std::vector<uint8_t> out = rig.dinBytes();
+  CHECK(out.size() >= 6 + 1 + 48 * 3);
+  CHECK(out.size() >= 7 && out[0] == 0xFC); // realtime goes first
+  CHECK(out.size() >= 7 && out[1] == 0x80 && out[2] == 60 && out[4] == 0x81 && out[5] == 62);
+  CHECK(countByte(out, 0xB0) == 3 && countByte(out, 0xBF) == 3);
+  Panic::Summary state = panic.summary();
+  CHECK(!state.active && state.panics == 1 && state.held[0] == 0);
+
+  // Level 3: a note-off for every note on every channel, fed as the queue has room
+  panic.request(3);
+  run(1);
+  CHECK(panic.summary().active);
+  run(2000); // ~4 bytes per pump, like 1 ms on the device: level 3 takes about 2 s
+  out = rig.dinBytes();
+  CHECK(out.size() == 1 + 48 * 3 + 2048 * 3);
+  CHECK(!panic.summary().active && panic.summary().panics == 2);
+
+  // Active Sensing from DIN stops: its notes are released, USB notes stay
+  rig.router.route(msg(MidiSource::Din, {0x90, 40, 100}));
+  rig.router.route(msg(MidiSource::Usb, {0x90, 41, 100}));
+  uint8_t sense = 0xFE;
+  panic.observe({MidiSource::Din, 0, &sense, 1});
+  gFakeMillis += 200;
+  run(1);
+  CHECK(rig.tracker.isHeld(MidiOutput::Din, 0, 40));
+  gFakeMillis += 200;
+  run(1);
+  CHECK(!rig.tracker.isHeld(MidiOutput::Din, 0, 40) && rig.tracker.isHeld(MidiOutput::Din, 0, 41));
+
+  // Notes held for 30 s are released automatically
+  gFakeMillis += 31000;
+  rig.dinBytes();
+  run(1);
+  out = rig.dinBytes();
+  CHECK(out == std::vector<uint8_t>({0x80, 41, 0}));
+  CHECK(rig.tracker.heldCount(MidiOutput::Din) == 0 && panic.summary().autoReleased == 2);
+}
+
+static void testRouterReleasesOnChange()
+{
+  OutputRig rig;
+  Router &r = rig.router;
+  r.route(msg(MidiSource::Usb, {0x90, 60, 100}));
+  rig.dinBytes();
+  // Forcing USB to channel 5 while the note is held: its note-off goes to channel 1 first
+  r.config().forceChannel[0] = 5;
+  r.changed();
+  r.applyPending();
+  CHECK(rig.dinBytes() == std::vector<uint8_t>({0x80, 60, 0}));
+  r.route(msg(MidiSource::Usb, {0x90, 61, 100}));
+  CHECK(rig.dinBytes() == std::vector<uint8_t>({0x94, 61, 100}));
+  // Changes that don't affect routing (LED level) leave held notes alone
+  r.config().ledLevel = 1;
+  r.changed();
+  r.applyPending();
+  CHECK(rig.dinBytes().empty() && rig.tracker.isHeld(MidiOutput::Din, 4, 61));
+}
+
 int main()
 {
   testDinParser();
@@ -646,7 +728,9 @@ int main()
   testClockSwing();
   testClockFollow();
   testTapTempo();
+  testPanic();
   gRunRig = nullptr;
+  testRouterReleasesOnChange();
   testRouterMigration();
   printf("%d checks, %d failures\n", gChecks, gFailures);
   return gFailures ? 1 : 0;

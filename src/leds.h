@@ -22,6 +22,9 @@ public:
   void release(uint8_t owner);
   void setPixel(uint8_t owner, int index, RGBColor color); ///< ignored unless owner holds the LED
 
+  /*! Warnings and progress above everything else (panic); nullptr removes the overlay */
+  void setOverlay(const RGBColor *colors);
+
 private:
   struct Flash
   {
@@ -32,6 +35,8 @@ private:
   Flash _flash[2]; // indexed by MidiSource
   uint8_t _owner[kCount] = {0};
   RGBColor _pixel[kCount];
+  RGBColor _overlay[kCount];
+  bool _overlayOn = false;
   uint32_t _lastFrame = 0;
   bool _lit = false;
 };

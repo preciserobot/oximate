@@ -33,7 +33,7 @@ synth.
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | idea |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | idea |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | idea |
-| 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | partly | M1 done (output layer, note tracker) |
+| 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
 | 17 | [BLE MIDI](#stage-17-ble-midi) | — | idea |
 | 18 | [Network MIDI](#stage-18-network-midi) | — | idea |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | idea |
@@ -88,6 +88,27 @@ documentation is ambiguous on this point.
 The Core2's USB-C port is a USB-serial bridge (CH9102), not a USB MIDI
 device. It can't appear as a MIDI port on a computer. All USB MIDI goes through
 the USB Host Module.
+
+## Controls
+
+* **Switch page:** tap the header bar at the top of the screen. The page name
+  with `>` on the left shows where you are: Monitor → Router → Clock →
+  Diag → Monitor.
+* **Touch buttons A/B/C** (the three circles below the screen) belong to the
+  current page; the bottom bar shows their labels. Holding a button for about
+  0.5 s is a separate action on some pages.
+* **Power button** (left side): short press = **panic** (note-offs, all notes
+  off, Stop); hold about 1.5 s = **panic all** (also a note-off for every
+  note on every channel, about 2 s on DIN). Holding it for 6 s still powers
+  the Core2 off.
+* **Reset button** (underneath): restarts the device.
+
+| Page | A | B | C |
+|------|---|---|---|
+| Monitor | Clear the log | Pause / resume | Show / hide clock messages |
+| Router | All channels on | LED brightness | Default settings |
+| Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
+| Diag | Reset counters | Next view | Panic (hold: panic all) |
 
 ## Architecture
 
@@ -190,8 +211,10 @@ with the event ring to the UI, the SPI bus lock (`src/spi_bus.*`), DIN
 output with realtime priority, timestamps on every message, `MidiOutputs`
 and `NoteTracker`, and the router sending through them with its settings
 handed over safely between cores. The `ClockEngine` with its
-`esp_timer` wake-up and LED claims came with stage 8. Not built yet: input
-interceptors/observers and the panic job.
+`esp_timer` wake-up and LED claims came with stage 8; the panic job, LED
+overlay and the MIDI task loop hook with stage 16. Not built yet: input
+interceptors/observers as a general mechanism (stage 16 observes input
+directly in `onMidi()`).
 
 **Suggested build order:** first the stage 8 timing core (its milestones 1–2)
 and the stage 16 output layer (its milestone 1). These are the foundation.
@@ -492,6 +515,19 @@ Get out of stuck-note situations quickly, and see what's going on.
 * **Diagnostics page:** channel activity, message counters and rates, DIN
   TX buffer, dropped SysEx, USB errors, heap/PSRAM, battery.
 
+**Implemented (2026-11-01)**, with these differences from the plan:
+
+* Level 3 sends ordinary 3-byte note-offs (about 2 s on DIN) instead of a
+  running-status stream (1.3 s), so other output never has to pause.
+* Stuck notes are released after 30 s, as decided; there is no setting for
+  the threshold yet.
+* The header-hold fallback isn't built; C on the Diag page does the same.
+* Counters: per input and message type, filtered, output totals, DIN and USB
+  queue drops, SPI-bus-busy skips, UI events dropped, UI loop time. Not yet:
+  DIN receive overruns and USB error codes.
+* The Diag page shows channels 1–10 on the LED bar while it's open; panic
+  progress overlays the LED bar on any page.
+
 **Full plan:** [docs/stages/stage-16.md](docs/stages/stage-16.md)
 
 ### Stage 17: BLE MIDI
@@ -609,6 +645,9 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/tap_tempo.h`   | tap tempo averaging |
 | `src/platform_time.h` | 64-bit microsecond clock (esp_timer) |
 | `src/ui.*`          | page switching, header and footer |
+| `src/panic.*`       | panic levels 1–3, automatic release (USB unplug, Active Sensing, stuck notes) |
+| `src/diagnostics.h` | input statistics |
+| `src/diag_page.*`   | the Diag page |
 
 ## Credits
 

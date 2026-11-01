@@ -43,6 +43,8 @@ public:
   void begin(DinMidi &din, UsbMidi &usb, NoteTracker &tracker);
   void send(MidiOutput out, const MidiMessage &msg, Origin origin);
   bool available(MidiOutput out) const; ///< false while no USB device is connected
+  bool hasSpace(MidiOutput out, uint16_t length) const; ///< a message of `length` bytes fits now
+  NoteTracker &tracker() { return *_tracker; }
 
   const Counters &counters() const { return _counters; }
 

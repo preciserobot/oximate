@@ -53,5 +53,7 @@ constexpr int kPriority = 10; ///< above loopTask (1), below the radio stacks (1
 constexpr uint32_t kStackBytes = 8192;
 
 void start(UsbMidi &usb, DinMidi &din, ClockEngine &clock);
+/*! Extra work for every task loop (router hand-over, panic, statistics); set before start() */
+void setLoopHook(void (*hook)(uint32_t nowMillis));
 EventRing &events();
 } // namespace MidiTask

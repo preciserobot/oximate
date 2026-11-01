@@ -21,6 +21,7 @@ public:
   void poll();   ///< read and parse received bytes
   void pumpTx(); ///< top up the UART FIFO from the queues; call at least every millisecond
   void send(const MidiMessage &msg);
+  size_t txSpace() const { return _queue.space(); } ///< free bytes for non-realtime messages
 
   const Counters &counters() const { return _counters; }
 

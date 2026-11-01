@@ -158,6 +158,14 @@ void NoteTracker::release(MidiOutputs &outputs, MidiOutput out, const Origin *on
 
 void NoteTracker::clear(MidiOutput out) { _state[(int)out] = State(); }
 
+void NoteTracker::forget(MidiOutput out, uint8_t channel, uint8_t note)
+{
+  State &s = _state[(int)out];
+  reset(s.held[channel], note);
+  reset(s.sustained[channel], note);
+  freeSlot(s, channel, note);
+}
+
 bool NoteTracker::findStuck(uint32_t nowMillis, uint32_t thresholdMillis, MidiOutput &out, HeldNote &stuck) const
 {
   bool found = false;

@@ -5,6 +5,7 @@
 
 #include "clock_engine.h"
 #include "midi_outputs.h"
+#include "note_tracker.h"
 
 static constexpr uint32_t kSaveDelayMillis = 2000; // batch rapid taps into one flash write
 static const char *const kNamespace = "oximate";
@@ -27,13 +28,44 @@ void Router::begin(MidiOutputs &outputs, ClockEngine &clock)
   _outputs = &outputs;
   _clock = &clock;
   load();
-  apply();
+  _active = _edit;
 }
 
+/*! UI: hand the edited settings to the MIDI task */
 void Router::apply()
 {
   CriticalGuard guard(_lock);
-  _active = _edit;
+  _pending = _edit;
+  _pendingSet = true;
+}
+
+bool Router::routingChanged(const RouterConfig &a, const RouterConfig &b, MidiSource input)
+{
+  int i = (int)input;
+  if (a.channelMask[i] != b.channelMask[i] || a.forceChannel[i] != b.forceChannel[i]) return true;
+  return input == MidiSource::Usb ? a.usbToDin != b.usbToDin
+                                  : (a.dinToDin != b.dinToDin || a.dinToUsb != b.dinToUsb);
+}
+
+void Router::applyPending()
+{
+  RouterConfig next;
+  {
+    CriticalGuard guard(_lock);
+    if (!_pendingSet) return;
+    next = _pending;
+    _pendingSet = false;
+  }
+  // Notes started under the old routing get their note-offs now, on the same output and
+  // channel, before the new settings could send the note-off somewhere else
+  for (MidiSource input : {MidiSource::Usb, MidiSource::Din}) {
+    if (routingChanged(_active, next, input)) {
+      Origin origin = Origin::fromInput(input);
+      _outputs->tracker().release(*_outputs, MidiOutput::Din, &origin);
+      _outputs->tracker().release(*_outputs, MidiOutput::Usb, &origin);
+    }
+  }
+  _active = next;
 }
 
 bool Router::passes(const RouterConfig &config, const MidiMessage &msg)
@@ -52,11 +84,8 @@ bool Router::passes(const RouterConfig &config, const MidiMessage &msg)
 
 bool Router::route(const MidiMessage &msg)
 {
-  RouterConfig config;
-  {
-    CriticalGuard guard(_lock);
-    config = _active;
-  }
+  applyPending();
+  const RouterConfig &config = _active;
   switch (msg.status()) {
     case 0xF2: // song position
     case 0xF8: // clock

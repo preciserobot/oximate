@@ -73,6 +73,8 @@ public:
   void poll();                ///< handle buttons and touch, redraw what changed
   void footerChanged() { _footerDirty = true; }
   void setUsbDevice(bool connected, uint16_t vid, uint16_t pid);
+  /*! Show a short message in the header's right side for `millis` (e.g. "PANIC") */
+  void flash(const char *text, uint16_t color, uint32_t millis);
 
 private:
   void show(int index);
@@ -86,6 +88,10 @@ private:
 
   bool _usbConnected = false;
   uint16_t _usbVid = 0, _usbPid = 0;
+
+  char _flashText[20] = "";
+  uint16_t _flashColor = TFT_WHITE;
+  uint32_t _flashUntil = 0;
 
   bool _headerDirty = true, _footerDirty = true;
   uint32_t _lastFrame = 0, _lastHeader = 0;

@@ -53,6 +53,14 @@ void Ui::setUsbDevice(bool connected, uint16_t vid, uint16_t pid)
   }
 }
 
+void Ui::flash(const char *text, uint16_t color, uint32_t millisToShow)
+{
+  strncpy(_flashText, text, sizeof(_flashText) - 1);
+  _flashColor = color;
+  _flashUntil = millis() + millisToShow;
+  _headerDirty = true;
+}
+
 void Ui::poll()
 {
   if (_pageCount == 0) {
@@ -86,6 +94,10 @@ void Ui::poll()
     return;
   }
   if (now - _lastHeader >= kHeaderMillis) {
+    _headerDirty = true;
+  }
+  if (_flashUntil && (int32_t)(now - _flashUntil) >= 0) {
+    _flashUntil = 0; // flash over: back to the clock display
     _headerDirty = true;
   }
   if (!_headerDirty && !_footerDirty && !page.dirty()) {
@@ -138,6 +150,13 @@ void Ui::drawHeader()
   M5.Display.setTextColor(TFT_WHITE, kBarColor);
   M5.Display.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
   M5.Display.print(text);
+  if (_flashUntil) {
+    const int x = 24 * kCharWidth; // where the clock text starts
+    M5.Display.fillRect(x, 0, M5.Display.width() - x, kHeaderHeight, _flashColor);
+    M5.Display.setTextColor(TFT_WHITE, _flashColor);
+    M5.Display.setCursor(x + 4, (kHeaderHeight - kCharHeight) / 2);
+    M5.Display.print(_flashText);
+  }
 }
 
 void Ui::drawFooter()
