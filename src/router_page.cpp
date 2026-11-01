@@ -56,6 +56,7 @@ static void forceChannelText(const char *input, uint8_t force, char *out, size_t
 void RouterPage::draw()
 {
   const RouterConfig &c = _router.config();
+  DisplayLock lock;
   M5.Display.fillRect(0, kContentTop, M5.Display.width(), kContentHeight, TFT_BLACK);
 
   drawChip(0 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "USB>DIN", c.usbToDin);

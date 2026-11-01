@@ -1,5 +1,5 @@
 # Created By: zapTheGoose
-.PHONY: all build send
+.PHONY: all build send test
 
 PORT ?= /dev/cu.usbserial-58620052741
 
@@ -21,3 +21,11 @@ send:
 		--port $(PORT) \
 		--fqbn esp32:esp32:m5stack_core2
 
+
+# Host unit tests (no hardware needed)
+TEST_SOURCES = test/test_main.cpp src/din_midi.cpp src/usb_midi.cpp src/router.cpp \
+	src/midi_outputs.cpp src/note_tracker.cpp src/midi_task.cpp
+test:
+	mkdir -p build
+	c++ -std=c++17 -Wall -Wno-unused-private-field -Itest/stubs -Isrc $(TEST_SOURCES) -o build/tests
+	./build/tests

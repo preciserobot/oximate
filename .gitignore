@@ -33,3 +33,4 @@ libraries/*
 *.exe
 *.out
 *.app
+build/

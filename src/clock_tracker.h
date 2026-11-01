@@ -25,7 +25,7 @@ public:
     State &clock = _state[(int)msg.source];
     switch (msg.status()) {
       case 0xF8: {
-        uint32_t now = micros();
+        uint32_t now = msg.timeMicros ? msg.timeMicros : micros(); // stamped at the input
         clock.lastTickMillis = millis();
         if (clock.ticks == 0) {
           clock.beatStartMicros = now;

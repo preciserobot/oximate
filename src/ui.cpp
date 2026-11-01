@@ -8,6 +8,7 @@ static constexpr uint32_t kHeaderMillis = 500; // BPM readout changes without ot
 void Ui::begin(const ClockTracker &clock)
 {
   _clock = &clock;
+  DisplayLock lock;
   M5.Display.fillScreen(TFT_BLACK);
   M5.Display.setFont(&fonts::AsciiFont8x16);
   M5.Display.setTextWrap(false);
@@ -23,7 +24,10 @@ void Ui::addPage(Page &page)
 void Ui::show(int index)
 {
   _current = index;
-  M5.Display.fillRect(0, kHeaderHeight, M5.Display.width(), kFooterTop - kHeaderHeight, TFT_BLACK);
+  {
+    DisplayLock lock;
+    M5.Display.fillRect(0, kHeaderHeight, M5.Display.width(), kFooterTop - kHeaderHeight, TFT_BLACK);
+  }
   _pages[_current]->enter();
   _headerDirty = _footerDirty = true;
 }
@@ -69,7 +73,7 @@ void Ui::poll()
     return;
   }
   _lastFrame = now;
-  M5.Display.startWrite();
+  // Each part takes the bus separately, so USB polling can run between them
   if (_headerDirty) {
     drawHeader();
     _lastHeader = now;
@@ -83,7 +87,6 @@ void Ui::poll()
     drawFooter();
     _footerDirty = false;
   }
-  M5.Display.endWrite();
 }
 
 void Ui::drawHeader()
@@ -108,6 +111,7 @@ void Ui::drawHeader()
 
   char text[48];
   snprintf(text, sizeof(text), "%-8s%-15s %s", title, usb, clock);
+  DisplayLock lock;
   M5.Display.fillRect(0, 0, M5.Display.width(), kHeaderHeight, kBarColor);
   M5.Display.setTextColor(TFT_WHITE, kBarColor);
   M5.Display.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
@@ -120,6 +124,7 @@ void Ui::drawFooter()
   const char *labels[3] = {"", "", ""};
   _pages[_current]->buttonLabels(labels);
   const int centers[3] = {53, 160, 267};
+  DisplayLock lock;
   M5.Display.fillRect(0, kFooterTop, M5.Display.width(), M5.Display.height() - kFooterTop, kBarColor);
   M5.Display.setTextColor(TFT_WHITE, kBarColor);
   M5.Display.setTextDatum(top_center);

@@ -18,6 +18,7 @@ struct MidiMessage
   uint8_t cable;        ///< USB-MIDI virtual cable (always 0 for DIN)
   const uint8_t *bytes; ///< status byte first; SysEx includes F0 ... F7
   uint16_t length;
+  uint32_t timeMicros = 0; ///< when the message arrived at its input (0 for generated messages)
 
   uint8_t status() const { return bytes[0]; }
   bool isChannel() const { return bytes[0] < 0xF0; }

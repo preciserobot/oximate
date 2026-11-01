@@ -2,6 +2,19 @@
 
 #include <M5Unified.h>
 #include "clock_tracker.h"
+#include "spi_bus.h"
+
+/*! Holds the shared SPI bus and an M5GFX write transaction. Keep each one short (a few ms):
+ *  the MIDI task skips USB polling while the display holds the bus. */
+class DisplayLock
+{
+public:
+  DisplayLock() { M5.Display.startWrite(); }
+  ~DisplayLock() { M5.Display.endWrite(); }
+
+private:
+  SpiLock _bus; // constructed before startWrite(), released after endWrite()
+};
 
 /*! Screen layout shared by all pages (320x240, 8x16 font = 40 columns) */
 namespace Layout
@@ -28,7 +41,7 @@ public:
   virtual void onButton(int index) = 0;     ///< 0 = A, 1 = B, 2 = C
   virtual void onTouch(int x, int y) {}     ///< taps in the content area
   virtual void enter() { _dirty = true; }   ///< page became visible
-  virtual void draw() = 0;                  ///< redraw the content area (only called when dirty())
+  virtual void draw() = 0;                  ///< redraw the content area (only called when dirty()); takes DisplayLock itself
 
   bool dirty() const { return _dirty; }
   void clean() { _dirty = false; }

@@ -12,7 +12,7 @@ static void noteName(uint8_t note, char *out, size_t size)
   snprintf(out, size, "%s%d", kNoteNames[note % 12], note / 12 - 1);
 }
 
-void describeMidi(const MidiMessage &msg, char *out, size_t size)
+void describeMidi(const MidiMessage &msg, char *out, size_t size, uint16_t totalLength)
 {
   char source[5];
   if (msg.source == MidiSource::Din) {
@@ -40,8 +40,11 @@ void describeMidi(const MidiMessage &msg, char *out, size_t size)
     case 0xD0: snprintf(body, sizeof(body), "ChanAT   %d", b[1]); break;
     case 0xE0: snprintf(body, sizeof(body), "Bend     %+d", ((b[2] << 7) | b[1]) - 8192); break;
     case 0xF0: {
-      int n = snprintf(body, sizeof(body), "SysEx %u:", msg.length);
-      for (uint16_t i = 1; i < msg.length - 1 && n < (int)sizeof(body) - 3; i++) {
+      uint16_t length = totalLength ? totalLength : msg.length;
+      int n = snprintf(body, sizeof(body), "SysEx %u:", length);
+      // Data bytes only: skip F0 and, when the message is complete, F7
+      uint16_t end = msg.bytes[msg.length - 1] == 0xF7 ? msg.length - 1 : msg.length;
+      for (uint16_t i = 1; i < end && n < (int)sizeof(body) - 3; i++) {
         n += snprintf(body + n, sizeof(body) - n, " %02X", b[i]);
       }
       break;
@@ -63,13 +66,15 @@ void describeMidi(const MidiMessage &msg, char *out, size_t size)
 
 void Monitor::begin()
 {
-  _canvas.setColorDepth(8);
-  _canvas.createSprite(M5.Display.width(), kLines * kCharHeight);
-  _canvas.setFont(&fonts::AsciiFont8x16);
-  _canvas.setTextWrap(false);
+  for (M5Canvas &band : _bands) {
+    band.setColorDepth(8);
+    band.createSprite(M5.Display.width(), kLinesPerBand * kCharHeight);
+    band.setFont(&fonts::AsciiFont8x16);
+    band.setTextWrap(false);
+  }
 }
 
-void Monitor::log(const MidiMessage &msg, bool forwarded)
+void Monitor::log(const MidiMessage &msg, bool forwarded, uint16_t totalLength)
 {
   if (_paused) {
     return;
@@ -79,7 +84,7 @@ void Monitor::log(const MidiMessage &msg, bool forwarded)
     return;
   }
   char text[kLineLength];
-  describeMidi(msg, text, sizeof(text));
+  describeMidi(msg, text, sizeof(text), totalLength);
   uint16_t color = msg.source == MidiSource::Usb ? kUsbColor : kDinColor;
   addLine(forwarded ? color : kFilteredColor, text);
   Serial.println(text);
@@ -122,14 +127,20 @@ void Monitor::onButton(int index)
 
 void Monitor::draw()
 {
-  _canvas.fillScreen(TFT_BLACK);
-  // Oldest line at the top, newest at the bottom
+  // Oldest line at the top, newest at the bottom; screen row r shows log line r - (kLines - _count)
   int first = (_head - _count + kLines) % kLines;
-  for (int i = 0; i < _count; i++) {
-    const Line &line = _lines[(first + i) % kLines];
-    _canvas.setTextColor(line.color);
-    _canvas.setCursor(0, (kLines - _count + i) * kCharHeight);
-    _canvas.print(line.text);
+  for (int b = 0; b < kBands; b++) {
+    M5Canvas &band = _bands[b];
+    band.fillScreen(TFT_BLACK);
+    for (int r = 0; r < kLinesPerBand; r++) {
+      int i = b * kLinesPerBand + r - (kLines - _count);
+      if (i < 0) continue;
+      const Line &line = _lines[(first + i) % kLines];
+      band.setTextColor(line.color);
+      band.setCursor(0, r * kCharHeight);
+      band.print(line.text);
+    }
+    DisplayLock lock;
+    band.pushSprite(0, kContentTop + b * kLinesPerBand * kCharHeight);
   }
-  _canvas.pushSprite(0, kContentTop);
 }

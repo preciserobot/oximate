@@ -1,9 +1,9 @@
 #pragma once
 
 #include "midi_message.h"
+#include "sync.h"
 
-class DinMidi;
-class UsbMidi;
+class MidiOutputs;
 
 /*! Which input's clock and transport (F8, FA, FB, FC, F2) is forwarded */
 enum class ClockSource : uint8_t
@@ -30,28 +30,31 @@ struct RouterConfig
   uint8_t ledLevel = 2;                     ///< 0 off, 1 low, 2 medium, 3 high
 };
 
-/*! Filters, remaps and forwards merged MIDI according to RouterConfig */
+/*! Filters, remaps and forwards merged MIDI according to RouterConfig.
+ *  route() runs in the MIDI task; config(), changed() and poll() belong to the UI. */
 class Router
 {
 public:
-  void begin(DinMidi &din, UsbMidi &usb);
+  void begin(MidiOutputs &outputs);
 
-  /*! Forward a message; returns false if it was filtered out completely */
+  /*! Forward a message; returns false if it was filtered out completely (MIDI task) */
   bool route(const MidiMessage &msg);
 
-  RouterConfig &config() { return _config; }
-  void changed();       ///< call after modifying config(); saved after a short delay
+  RouterConfig &config() { return _edit; } ///< the UI's copy
+  void changed();       ///< apply config() to the MIDI task now; saved after a short delay
   void resetDefaults();
-  void poll();          ///< performs delayed saves
+  void poll();          ///< performs delayed saves (UI)
 
 private:
-  bool passes(const MidiMessage &msg) const;
+  static bool passes(const RouterConfig &config, const MidiMessage &msg);
+  void apply();
   void load();
   void save();
 
-  RouterConfig _config;
-  DinMidi *_din = nullptr;
-  UsbMidi *_usb = nullptr;
+  RouterConfig _edit;   // edited by the UI
+  RouterConfig _active; // read by route(), replaced under _lock
+  CriticalSection _lock;
+  MidiOutputs *_outputs = nullptr;
   uint32_t _changedMillis = 0;
   bool _dirty = false;
 };

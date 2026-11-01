@@ -25,7 +25,7 @@ synth.
 | 5 | [Drum machine](#stage-5-drum-machine) | — | planned (full plan) |
 | 6 | [Preview synth](#stage-6-preview-synth) | — | planned (full plan) |
 | 7 | [Ear trainer](#stage-7-ear-trainer) | — | planned (full plan) |
-| 8 | [Clock master](#stage-8-clock-master) | — | planned (full plan) |
+| 8 | [Clock master](#stage-8-clock-master) | partly | M1–M2 done (MIDI task, DIN priority); needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | — | planned (full plan) |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | idea |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | idea |
@@ -33,7 +33,7 @@ synth.
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | idea |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | idea |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | idea |
-| 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | — | planned (full plan) |
+| 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | partly | M1 done (output layer, note tracker) |
 | 17 | [BLE MIDI](#stage-17-ble-midi) | — | idea |
 | 18 | [Network MIDI](#stage-18-network-midi) | — | idea |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | idea |
@@ -184,6 +184,14 @@ piece is built by the first stage that needs it.
 
 **Channel 16 is reserved** for SAM2695 settings (stage 6). The ear trainer
 defaults to channel 15. The Oxi encoder CCs use the M8's control channel.
+
+**Built so far (2026-11-01):** the MIDI task on core 0 (`src/midi_task.*`)
+with the event ring to the UI, the SPI bus lock (`src/spi_bus.*`), DIN
+output with realtime priority, timestamps on every message, `MidiOutputs`
+and `NoteTracker`, and the router sending through them with its settings
+handed over safely between cores. Not built yet: the hardware timer and
+`ClockEngine` (stage 8, M3 onwards), input interceptors/observers, LED
+claims, and the panic job.
 
 **Suggested build order:** first the stage 8 timing core (its milestones 1–2)
 and the stage 16 output layer (its milestone 1). These are the foundation.
@@ -546,6 +554,15 @@ make send PORT=/dev/cu.usbserial-XXXX    # upload
 make                                     # build + send
 ```
 
+### Unit tests
+
+```sh
+make test     # host build of the parsers, router, note tracker, output queues and event ring
+```
+
+The tests compile the hardware-independent modules on the Mac against the
+stand-ins in `test/stubs/`.
+
 ### USB Host Shield 2.0 (patched)
 
 On the first build, the `Makefile` clones USB Host Shield 2.0 at commit
@@ -557,7 +574,12 @@ which sets the Core2 pin mapping above, and marks the version as
 
 | File | Purpose |
 |------|---------|
-| `oximate.ino`       | setup and loop; wires inputs to router, clock tracker, LEDs and monitor |
+| `oximate.ino`       | setup and loop: starts the MIDI task, then drains its events into the UI |
+| `src/midi_task.*`   | MIDI task on core 0 (polls USB and DIN every 1 ms) and the event ring to the UI |
+| `src/midi_outputs.*`| the single send path (DIN, USB), with counters |
+| `src/note_tracker.*`| held and sustained notes per output, as sent |
+| `src/spi_bus.*`     | lock for the SPI bus shared by display, USB host and SD |
+| `src/sync.h`        | small critical sections between the two cores |
 | `src/midi_message.h`| `MidiMessage`, the common type for complete messages |
 | `src/usb_midi.*`    | USB host: USB-MIDI packets ⇄ messages, including SysEx assembly |
 | `src/din_midi.*`    | DIN serial: byte stream (running status, realtime) ⇄ messages |
