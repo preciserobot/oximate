@@ -50,12 +50,15 @@
 #include "src/monitor.h"
 #include "src/note_tracker.h"
 #include "src/panic.h"
+#include "src/looper.h"
+#include "src/looper_page.h"
 #include "src/phrase_page.h"
 #include "src/phrase_tracker.h"
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
 #include "src/sd_check.h"
+#include "src/sd_store.h"
 #include "src/speaker_synth.h"
 #include "src/spi_bus.h"
 #include "src/synth_page.h"
@@ -97,6 +100,8 @@ ClockAnalyser clockAnalyser; // stage 9: fed by an input observer in the MIDI ta
 AnalyserPage analyserPage(clockAnalyser, leds);
 PhraseTracker phraseTracker; // stage 22: counts bars in the MIDI task (ClockEngine listener)
 PhrasePage phrasePage(phraseTracker, leds);
+Looper looper;                                       // stage 13: runs in the MIDI task
+LooperPage looperPage(looper, clockEngine, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
@@ -119,6 +124,7 @@ void midiTaskLoop(uint32_t nowMillis)
   drumMachine.run(nowMillis);
   genEngine.run(nowMillis);
   fxEngine.run();
+  looper.run(nowMillis);
   phraseTracker.run();
   chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
@@ -146,6 +152,7 @@ void setup()
   localSound.begin(outputs);
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
   genEngine.begin(outputs, clockEngine);   // clock listener
+  looper.begin(outputs, clockEngine, &phraseTracker); // clock listener, input observer, phrase hook
   ClockSource oldClock;
   if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
     static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
@@ -185,6 +192,7 @@ void setup()
   } else {
     Serial.println("SD: no card (or not FAT16/FAT32)");
   }
+  SdStore::begin([] { return clockEngine.snapshot().running; }); // 1 KB chunks while the clock runs
 
   // Keep the start-up screen up for at least 3 s, then the pages take over
   while (millis() - splashStart < 3000) delay(10);
@@ -199,6 +207,7 @@ void setup()
   ui.addPage(clockPage);
   ui.addPage(analyserPage);
   ui.addPage(phrasePage);
+  ui.addPage(looperPage);
   earPage.begin();
   ui.addPage(earPage);
   chordPage.begin();
@@ -360,6 +369,7 @@ void loop()
   clockEngine.poll();
   samSynth.poll();
   phraseTracker.poll();
+  looper.poll();
   haptics.poll();
   checkBattery();
   earPage.poll();

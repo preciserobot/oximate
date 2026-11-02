@@ -260,6 +260,25 @@ FX page (after Router). USB keyboard into OxiMate, DIN OUT to a synth (or the SA
 - [ ] Panic while the arp plays: everything stops
   > Anything stuck, or arp timing off against the M8 / Elektron?
 
+## 15. Looper (stage 13)
+
+Internal clock running (Clock page: Start), a keyboard on USB or DIN. The SD card in.
+
+- [ ] Loop page appears after Phrase; LEDs show the loop state while it is open
+- [ ] A arms (ARMED, red pulse); recording starts on the next bar line (REC)
+- [ ] After 4 bars (default) it loops: what you played comes back in time (LOOP, green)
+- [ ] A note held over the loop end doesn't hang (it is cut at the end)
+- [ ] C overdubs a second pass on top; it is heard from the next cycle on; C again ends it
+- [ ] Hold A (or the Undo chip) removes the last pass; Clear empties the loop
+- [ ] B mutes / unmutes playback; Stop on the Clock page stops it with no hanging notes
+- [ ] Bars, quantise (1/16 pulls notes to the grid), input, channel and output chips work
+- [ ] "Phrase" chip: recording waits for the next phrase of the Phrase page
+- [ ] Save: "Saved loop001.mid"; the file opens in a DAW on the Mac at the right tempo
+- [ ] Load: the file list shows it; tapping it loads the loop, which starts at the next bar
+- [ ] Saving while playing: no audible hiccup in USB/DIN timing
+  > Diag system view "bus held" during a save:
+- [ ] Without an SD card: Save/Load show "No SD card", looping still works
+
 ## Other notes
 
 >
