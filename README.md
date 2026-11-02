@@ -28,7 +28,7 @@ synth.
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | ✅ | needs hardware test |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | ✅ | needs hardware test |
-| 11 | [MIDI effects](#stage-11-midi-effects) | — | planned (full plan) |
+| 11 | [MIDI effects](#stage-11-midi-effects) | ✅ | needs hardware test |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | ✅ | needs hardware test |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | planned (full plan) |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | planned (full plan) |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Drums → Gen → Clock → Analyse → Phrase → Ear → Chord → Diag → Monitor.
+  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -121,6 +121,7 @@ the USB Host Module.
 |------|---|---|---|
 | Monitor | Clear the log | Pause / resume | Show / hide clock messages |
 | Router | All channels on | LED brightness | Default settings |
+| FX | − selected setting (hold: repeat) | Bypass the shown input's chain (hold: save both chains to the shown preset) | + selected setting (hold: repeat) |
 | Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
 | Drums | Play / Stop (following an external clock: Arm / Disarm) | Mute lane (hold: solo); Sound view: audition | Next view (Grid → Sound → Pattern) |
 | Gen (list) | Previous slot (hold: realign all slots on the next bar) | Mute (Turing: lock / unlock; hold: reseed; Euclid hold: new rotation) | Next slot |
@@ -687,6 +688,38 @@ Arpeggiator, chord generator, scale quantiser, transpose, velocity curves and
 CC scaling. They're applied in the merge path between input and output, so
 they combine with the router's settings.
 
+**Implemented (2026-11-02)**, with the plan's defaults (chains per input, no default scale,
+no CCs configured, arp passes notes through while the transport is stopped):
+
+* `src/fx_engine.*` runs in the MIDI task. `Router::route()` hands channel messages to the
+  input's chain after the filter and forced channel, but only while the chain has something
+  to do (a slot on, or notes from earlier still needing their note-offs). Otherwise the
+  router's path is unchanged, and a test checks the output is byte-identical with all
+  effects off. What the chain produces goes to the input's destinations with the input's
+  origin, so the note tracker, panic and routing changes work as before (a routing change
+  also clears the chain's memory).
+* Each input note remembers the notes it produced (128 per input); its note-off ends exactly
+  those, even after settings changed or the slot was switched off.
+* Arp on the clock engine's Step events (swing applies): 1/4, 1/8, 1/16, 1/32; up, down,
+  up-down, random, as played; 1–4 octaves; gate; latch. Gates and the 1/32 offbeat are timed
+  in the MIDI task's loop (1 ms resolution) rather than the clock scheduler, so they don't use
+  scheduler slots.
+* FX page (after Router): USB / DIN tabs, preset chip (tap: load the next of 8 presets), one
+  row per slot (tap the box: on/off; tap the text: select, again: next setting), A/C −/+,
+  B bypass, hold B save preset. LEDs 0–5 show the shown input's active slots. Settings in NVS
+  under `fx` (v1), saved only while the transport is stopped.
+
+Differences from the plan:
+
+* One CC mapping per input instead of 8; no curve on CC mapping (min/max/invert only).
+* No triplet arp rates; no free-run option while stopped.
+* Stop (also sent by panic) ends the arp **and** its latched notes.
+* Switching the arp off ends its sounding note, but keys still held don't start sounding
+  normally; they play again from the next key press.
+* Scales are the 8 from `music_theory` (no mixolydian yet); chord types: maj, min, 7, min7,
+  sus4, 5th, octave, diatonic (from the scale).
+* No arp-step LED flash, no FX BYP marker in the header (the footer shows "Bypassed").
+
 **Plan (2026-11-01):** Per-input effect chains after the router's filters: transpose → scale quantise → chord → arpeggiator (clock-synced, latch) → velocity curve → CC scale/smoothing. Each input note remembers what it produced, so note-offs are always right, even when settings change. FX page, 8 presets.
 **Full plan:** [docs/stages/stage-11.md](docs/stages/stage-11.md)
 
@@ -1032,6 +1065,8 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/monitor.*`     | the Monitor page |
 | `src/router.*`      | filtering, remapping, routing; settings saved in NVS |
 | `src/router_page.*` | the Router page |
+| `src/fx_engine.*`   | MIDI effects per input (transpose, scale, chord, arp, velocity, CC), note mapping, presets |
+| `src/fx_page.*`     | the FX page |
 | `src/leds.*`        | GO Bottom2 LED bar |
 | `src/sam_synth.*`  | SAM2695 control: part map, layers, effects, auditions, restore after resets |
 | `src/synth_page.*`  | the Synth page and instrument browser |

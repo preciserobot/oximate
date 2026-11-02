@@ -40,6 +40,8 @@
 #include "src/drum_page.h"
 #include "src/gen_engine.h"
 #include "src/gen_page.h"
+#include "src/fx_engine.h"
+#include "src/fx_page.h"
 #include "src/input_observers.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
@@ -70,6 +72,7 @@ Panic panic;             // runs in the MIDI task; requested from the UI
 Stats stats;             // written by the MIDI task, read by the Diagnostics page
 SamSynth samSynth;       // runs in the MIDI task; settings from the Synth page
 DrumMachine drumMachine; // plays in the MIDI task on clock steps; edited on the Drums page
+FxEngine fxEngine;       // stage 11: MIDI effects in the router path; edited on the FX page
 GenEngine genEngine;     // stage 12: generators in the MIDI task; edited on the Gen page
 
 // UI side: Arduino loop() (core 1)
@@ -77,6 +80,7 @@ Leds leds;
 Ui ui;
 Monitor monitor;
 RouterPage routerPage(router, leds, clockEngine);
+FxPage fxPage(fxEngine, leds);
 SpeakerSynth speakerSynth;
 SynthPage synthPage(samSynth, speakerSynth);
 DrumPage drumPage(drumMachine, clockEngine, leds);
@@ -112,6 +116,7 @@ void midiTaskLoop(uint32_t nowMillis)
   samSynth.run(nowMillis);
   drumMachine.run(nowMillis);
   genEngine.run(nowMillis);
+  fxEngine.run();
   phraseTracker.run();
   chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
@@ -133,6 +138,8 @@ void setup()
   clockEngine.begin(outputs);
   phraseTracker.begin(clockEngine);
   router.begin(outputs, clockEngine);
+  fxEngine.begin(clockEngine); // clock listener (arpeggiator)
+  router.setFx(&fxEngine);
   samSynth.begin(outputs);
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
   genEngine.begin(outputs, clockEngine);   // clock listener
@@ -182,6 +189,7 @@ void setup()
   monitor.begin();
   ui.addPage(monitor);
   ui.addPage(routerPage);
+  ui.addPage(fxPage);
   ui.addPage(synthPage);
   ui.addPage(drumPage);
   ui.addPage(genPage);
@@ -356,6 +364,7 @@ void loop()
   chordPage.poll();
   drumMachine.poll();
   genEngine.poll();
+  fxEngine.poll();
   // Drum hits also play on the built-in speaker when the Synth page's output is the speaker
   uint8_t drumNote, drumVelocity;
   while (drumMachine.takeHit(drumNote, drumVelocity)) {

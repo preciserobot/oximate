@@ -5,6 +5,7 @@
 
 class MidiOutputs;
 class ClockEngine;
+class FxEngine;
 
 /*! Version 1 setting: which input's clock was forwarded. Only used to migrate old settings;
  *  since version 2 the clock engine owns clock and transport (see stage 8). */
@@ -37,6 +38,8 @@ class Router
 {
 public:
   void begin(MidiOutputs &outputs, ClockEngine &clock);
+  /*! Stage 11: MIDI effects between the channel rewrite and the outputs (optional) */
+  void setFx(FxEngine *fx);
 
   /*! Forward a message; returns false if it was filtered out completely (MIDI task) */
   bool route(const MidiMessage &msg);
@@ -52,6 +55,9 @@ public:
 
 private:
   static bool passes(const RouterConfig &config, const MidiMessage &msg);
+  bool hasDestination(const RouterConfig &config, MidiSource input) const;
+  bool sendToDestinations(const RouterConfig &config, MidiMessage out);
+  static void emitFromFx(MidiSource input, const MidiMessage &msg, void *ctx);
   void apply();
   static bool routingChanged(const RouterConfig &a, const RouterConfig &b, MidiSource input);
   void load();
@@ -64,6 +70,7 @@ private:
   CriticalSection _lock;
   MidiOutputs *_outputs = nullptr;
   ClockEngine *_clock = nullptr;
+  FxEngine *_fx = nullptr;
   bool _migrated = false;
   ClockSource _migratedClock = ClockSource::Both;
   uint32_t _changedMillis = 0;

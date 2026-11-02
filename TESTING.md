@@ -242,6 +242,23 @@ section, 1-bar warning.
 - [ ] Settings survive a power cycle (changed while stopped)
   > Which phrase lengths and warning time feel right in practice?
 
+## 14. MIDI effects (stage 11)
+
+FX page (after Router). USB keyboard into OxiMate, DIN OUT to a synth (or the SAM2695 on headphones).
+
+- [ ] With every slot off, everything sounds exactly as before (FX page untouched)
+- [ ] Transpose +12: notes come out an octave up; change it while holding a key and release: no stuck note
+- [ ] Scale (pick e.g. A minor): out-of-scale keys snap into the scale (nearest / up / down)
+- [ ] Chord: one key plays a triad; inversion and spread change it; diatonic follows the scale
+- [ ] Arp with the clock running (Clock page Start): held keys arpeggiate in time, with swing if set; releasing the keys stops it
+- [ ] Arp latch: it keeps going after release; a new chord replaces it; Stop ends it
+- [ ] Arp with the transport stopped: keys play normally
+- [ ] Velocity: fixed / soft / hard change the dynamics
+- [ ] CC: map e.g. CC 1 (mod wheel) to CC 74 with smoothing; the target glides
+- [ ] B bypasses the shown input's chain; hold B saves both chains to the preset; tapping the preset chip loads the next one; settings survive a power cycle (saved while stopped)
+- [ ] Panic while the arp plays: everything stops
+  > Anything stuck, or arp timing off against the M8 / Elektron?
+
 ## Other notes
 
 >
