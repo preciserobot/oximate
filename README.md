@@ -37,7 +37,7 @@ synth.
 | 17 | [BLE MIDI](#stage-17-ble-midi) | — | planned (full plan) |
 | 18 | [Network MIDI](#stage-18-network-midi) | — | planned (full plan) |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | planned (full plan) |
-| 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | idea |
+| 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | planned (full plan; needs the CV board) |
 | 21 | [Chord detector](#stage-21-chord-detector) | ✅ | needs hardware test |
 | 22 | [Phrase tracker](#stage-22-phrase-tracker) | ✅ | needs hardware test |
 
@@ -875,6 +875,23 @@ Sources:
 [Moog forum: DFAM voltages](https://forum.moogmusic.com/viewtopic.php?p=179088),
 [Moog forum: Run/Stop and ADV/CLK](https://forum.moogmusic.com/viewtopic.php?p=186955),
 [Mother-32 manual: clock input](https://www.manualslib.com/manual/988819/Moog-Mother-32.html?page=47).
+
+**Plan (2026-11-02):** from the DFAM manual:
+* ADV/CLOCK steps on each rising edge, and RUN/STOP doesn't reset, so
+  reaching a step means counting and pulsing.
+* The step burst holds velocity CV at 0 V, then fires TRIGGER at the note's
+  velocity, so skipped steps stay silent.
+
+Hardware: a ~€25–35 CV board on Port A:
+* MCP4728 DAC at 0x60 with TLV2374 op-amps, giving about ±4.9 V from a
+  −5 V charge pump;
+* 74AHCT125 gate buffers.
+
+Gates on G26 (ADV/CLOCK) and G27 (TRIGGER), with an optional step-follower
+input on G36. It adds a gate output to the clock engine, a DFAM page and
+multimeter calibration. Milestone 0 is a single buffered gate, to check
+whether skipped steps can be heard.
+**Full plan:** [docs/stages/stage-20.md](docs/stages/stage-20.md)
 
 ### Stage 21: Chord detector
 
