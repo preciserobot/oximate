@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 
+#include "cue_queue.h"
 #include "midi_task.h"
 #include "music_theory.h"
 
@@ -128,10 +129,6 @@ void EarPage::leave()
   if (_part >= 0) _synth.releasePart(_part);
   _part = -1;
   _leds.release(kOwner);
-  if (_vibrationOff) {
-    M5.Power.setVibration(0);
-    _vibrationOff = 0;
-  }
 }
 
 void EarPage::buttonLabels(const char *labels[3]) const
@@ -169,8 +166,8 @@ void EarPage::answered()
   _flashCorrect = correct;
   _flashUntil = millis() + kFlashMillis;
   if (_trainer.stats().vibration) {
-    M5.Power.setVibration(160);
-    _vibrationOff = millis() + (correct ? 60 : 200);
+    // Played by the haptics player (stage 10), which also owns the motor and its settings
+    Cues::post(correct ? Cue::RightAnswer : Cue::WrongAnswer);
   }
   statsChanged();
   markDirty();
@@ -333,10 +330,6 @@ void EarPage::tick()
     } else {
       i++;
     }
-  }
-  if (_vibrationOff && (int32_t)(now - _vibrationOff) >= 0) {
-    M5.Power.setVibration(0);
-    _vibrationOff = 0;
   }
   renderLeds();
 }

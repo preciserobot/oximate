@@ -35,6 +35,7 @@
 #include "src/diagnostics.h"
 #include "src/din_midi.h"
 #include "src/ear_page.h"
+#include "src/haptics.h"
 #include "src/drum_machine.h"
 #include "src/drum_page.h"
 #include "src/input_observers.h"
@@ -73,7 +74,8 @@ RouterPage routerPage(router, leds, clockEngine);
 SpeakerSynth speakerSynth;
 SynthPage synthPage(samSynth, speakerSynth);
 DrumPage drumPage(drumMachine, clockEngine, leds);
-ClockPage clockPage(clockEngine, leds);
+Haptics haptics; // stage 10: vibration and click cues (UI thread)
+ClockPage clockPage(clockEngine, leds, haptics);
 EarPage earPage(samSynth, speakerSynth, leds); // stage 7: ear trainer + chord explorer
 ChordInput chordInput;       // stage 21: held input notes, kept by an observer in the MIDI task
 ChordDetector chordDetector; // stage 21: names them (UI side); stableName() is the hook for stage 3
@@ -132,6 +134,13 @@ void setup()
   leds.setLevel(router.config().ledLevel);
   speakerSynth.begin();
 
+  // Stage 10: the motor is on the internal I2C bus, so only the UI thread drives it
+  Haptics::Output motor;
+  motor.vibrate = [](uint8_t level, void *) { M5.Power.setVibration(level); };
+  motor.click = [](bool accent, void *) { speakerSynth.click(accent); };
+  haptics.begin(motor, &clockEngine);
+  clockEngine.addListener(Haptics::clockListener, &haptics);
+
   Ui::splash("USB host");
   bool usbOk;
   {
@@ -162,6 +171,8 @@ void setup()
 
   InputHooks::addObserver(ClockAnalyser::observer, &clockAnalyser);
   InputHooks::addObserver(ChordInput::observer, &chordInput);
+  InputHooks::addObserver(Haptics::kickObserver, &haptics);
+  ui.setHooks([] { haptics.service(); }, [] { Cues::post(Cue::TouchTick); });
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
   MidiTask::start(usbMidi, dinMidi, clockEngine, outputs);
@@ -240,6 +251,11 @@ void handlePanic()
 
   // Red while the panic runs, and at least 400 ms so a quick one is still visible
   Panic::Summary state = panic.summary();
+  static uint32_t panicsDone = 0;
+  if (state.panics != panicsDone) {
+    if (panicsDone || state.panics == 1) Cues::post(Cue::PanicDone); // stage 10 cue
+    panicsDone = state.panics;
+  }
   bool recent = requestedAt && millis() - requestedAt < 400;
   if (state.active || recent) {
     RGBColor bar[Leds::kCount];
@@ -264,6 +280,23 @@ void logSlowLoop(uint32_t start, uint32_t events, uint32_t input, uint32_t drawn
                 (unsigned long)((end - drawn) / 1000));
 }
 
+/*! Low-battery cue (stage 10): once when the level drops below 10% while not charging */
+void checkBattery()
+{
+  static uint32_t lastCheck = 0;
+  static bool warned = false;
+  if (millis() - lastCheck < 30000) return;
+  lastCheck = millis();
+  int32_t level = M5.Power.getBatteryLevel();
+  bool charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
+  if (level >= 0 && level < 10 && !charging && !warned) {
+    Cues::post(Cue::LowBattery);
+    warned = true;
+  } else if (level >= 15 || charging) {
+    warned = false;
+  }
+}
+
 void loop()
 {
   uint32_t loopStart = micros();
@@ -281,13 +314,17 @@ void loop()
   handlePanic();
   ui.setUsbDevice(usbMidi.connected(), usbMidi.vendorId(), usbMidi.productId());
   uint32_t inputDone = micros();
+  haptics.service();
   ui.poll();
   uint32_t drawDone = micros();
+  haptics.service();
   clockPage.pollImu();
   leds.update();
   router.poll();
   clockEngine.poll();
   samSynth.poll();
+  haptics.poll();
+  checkBattery();
   earPage.poll();
   chordDetector.update(chordInput.snapshot(), millis()); // also off-page, so the history keeps up
   chordPage.poll();

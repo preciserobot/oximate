@@ -27,7 +27,7 @@ synth.
 | 7 | [Ear trainer](#stage-7-ear-trainer) | ✅ | needs hardware test |
 | 8 | [Clock master](#stage-8-clock-master) | ✅ | needs hardware test |
 | 9 | [Clock analyser](#stage-9-clock-analyser) | ✅ | needs hardware test |
-| 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | planned (full plan) |
+| 10 | [Haptic metronome](#stage-10-haptic-metronome) | ✅ | needs hardware test |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | planned (full plan) |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | planned (full plan) |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | planned (full plan) |
@@ -123,7 +123,7 @@ the USB Host Module.
 | Router | All channels on | LED brightness | Default settings |
 | Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
 | Drums | Play / Stop (following an external clock: Arm / Disarm) | Mute lane (hold: solo); Sound view: audition | Next view (Grid → Sound → Pattern) |
-| Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
+| Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
@@ -654,6 +654,27 @@ because the motor sits on the internal I2C bus. Cues differ by length and
 rhythm: beat 70 ms, downbeat 140 ms, double and triple pulses for warnings.
 There's also an optional speaker click per cue group, settings in a "Cues"
 view on the Clock page, and expected accuracy of about ±5 ms.
+**Implemented (2026-11-02):** `src/haptics.*` plays cues from the shared queue
+(`src/cue_queue.h`) on the UI thread: patterns from `src/haptic_patterns.h`,
+priorities, motor writes only when the level changes, and a speaker click per
+cue group. The beat listener in the MIDI task schedules each next beat one
+period ahead minus the lead time. `Ui::pushContent()` services cues between
+its slices. The settings are a third view on the Clock page (C: Main →
+Outputs → Cues), saved in NVS under `haptic`. Defaults until you decide:
+metronome, clock alerts, phrase, panic, answers and battery vibrate; kick and
+touch tick off; kick note 36 on channel 10; count-in off.
+
+Differences from the plan:
+
+* Clock lost / locked are detected on the UI side from the engine's snapshot
+  (locked only counts after a loss), not posted by the listener.
+* The count-in runs on the Clock page while it's open (1 or 2 bars at the
+  set tempo, internal clock only, no MIDI sent); leaving the page cancels it.
+  It uses the Metronome group's output.
+* Low battery is checked every 30 s (below 10%, not charging), once per drop.
+* The motor's spin-up time hasn't been measured with the IMU yet; the lead
+  defaults to 25 ms and can be set on the Cues view (0–50 ms).
+
 **Full plan:** [docs/stages/stage-10.md](docs/stages/stage-10.md)
 
 ### Stage 11: MIDI effects
@@ -958,7 +979,10 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/chord_page.*`  | the Chord page |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
-| `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |
+| `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, cue settings, count-in, LED beat display, IMU tap) |
+| `src/haptics.*`     | stage 10 cue player: vibration patterns, priorities, scheduled beats, speaker click; clock listener and kick observer |
+| `src/haptic_patterns.h` | the vibration pattern table |
+| `src/cue_queue.h`   | cue list and the queue any task posts cues to |
 | `src/clock_stats.*` | clock statistics per input (intervals, jitter, drift, dropouts, transport) and USB-vs-DIN phase |
 | `src/clock_analyser.*` | feeds the statistics from an input observer; copies for the UI; CSV queue |
 | `src/analyser_page.*` | the Analyse page (Stats, Histogram, Drift, Phase) |

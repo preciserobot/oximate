@@ -79,7 +79,6 @@ private:
   bool _asked = false;
   uint32_t _flashUntil = 0;
   bool _flashCorrect = false;
-  uint32_t _vibrationOff = 0;
   bool _statsDirty = false;
   uint32_t _statsChangedAt = 0;
 

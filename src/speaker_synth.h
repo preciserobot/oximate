@@ -19,6 +19,8 @@ public:
   /*! Test chord (C major) or drum pattern (kick, snare, hat) for `millis` */
   void test(bool drums, uint32_t millis);
   void update(); ///< call every loop: ends timed notes
+  /*! A short metronome click (stage 10); the accent is higher */
+  void click(bool accent);
 
 private:
   struct Voice

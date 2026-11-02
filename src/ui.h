@@ -99,6 +99,13 @@ public:
     if (_pageCount) _pages[_current]->onMidi(msg, forwarded);
   }
   void setUsbDevice(bool connected, uint16_t vid, uint16_t pid);
+  /*! Called between screen slices, so time-critical UI work (haptic cues) isn't held up by a
+   *  ~70 ms redraw, and on every touch button press or tap (touch tick) */
+  void setHooks(void (*service)(), void (*touched)())
+  {
+    _serviceHook = service;
+    _touchHook = touched;
+  }
   /*! Show a short message in the header's right side for `millis` (e.g. "PANIC") */
   void flash(const char *text, uint16_t color, uint32_t millis);
 
@@ -110,6 +117,9 @@ private:
 
   const ClockEngine *_clock = nullptr;
   void pushContent();
+
+  void (*_serviceHook)() = nullptr;
+  void (*_touchHook)() = nullptr;
 
   M5Canvas _content{&M5.Display}; // full screen, in PSRAM; pages draw here
   M5Canvas _header{&M5.Display};

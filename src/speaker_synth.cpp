@@ -89,3 +89,12 @@ void SpeakerSynth::update()
     }
   }
 }
+
+void SpeakerSynth::click(bool accent)
+{
+  // The last voice plays clicks; a note held there is cut short
+  const int voice = kVoices - 1;
+  _voices[voice].note = -1;
+  M5.Speaker.setChannelVolume(voice, 255);
+  M5.Speaker.tone(accent ? 2000.0f : 1400.0f, 12, voice, true, kNoiseWave, 16);
+}
