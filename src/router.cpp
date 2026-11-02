@@ -4,6 +4,7 @@
 #include <Preferences.h>
 
 #include "clock_engine.h"
+#include "fx_engine.h"
 #include "midi_outputs.h"
 #include "note_tracker.h"
 
@@ -29,6 +30,21 @@ void Router::begin(MidiOutputs &outputs, ClockEngine &clock)
   _clock = &clock;
   load();
   _active = _edit;
+}
+
+void Router::setFx(FxEngine *fx)
+{
+  _fx = fx;
+  if (fx) fx->setEmitter(emitFromFx, this);
+}
+
+/*! What the effects produce goes to the input's destinations, like plain thru */
+void Router::emitFromFx(MidiSource input, const MidiMessage &msg, void *ctx)
+{
+  Router *router = static_cast<Router *>(ctx);
+  MidiMessage out = msg;
+  out.source = input;
+  router->sendToDestinations(router->_active, out);
 }
 
 /*! UI: hand the edited settings to the MIDI task */
@@ -63,6 +79,7 @@ void Router::applyPending()
       Origin origin = Origin::fromInput(input);
       _outputs->tracker().release(*_outputs, MidiOutput::Din, &origin);
       _outputs->tracker().release(*_outputs, MidiOutput::Usb, &origin);
+      if (_fx) _fx->reset(input); // its remembered notes were just released
     }
   }
   _active = next;
@@ -114,9 +131,26 @@ bool Router::route(const MidiMessage &msg)
     out.bytes = remapped;
   }
 
-  Origin origin = Origin::fromInput(msg.source);
+  // Stage 11: the effect chain takes over while it has something to do; it sends what it
+  // produces through sendToDestinations()
+  if (_fx && out.isChannel() && _fx->engaged(msg.source)) {
+    _fx->process(out);
+    return hasDestination(config, msg.source);
+  }
+  return sendToDestinations(config, out);
+}
+
+bool Router::hasDestination(const RouterConfig &config, MidiSource input) const
+{
+  return input == MidiSource::Usb ? config.usbToDin
+                                  : (config.dinToDin || (config.dinToUsb && _outputs->available(MidiOutput::Usb)));
+}
+
+bool Router::sendToDestinations(const RouterConfig &config, MidiMessage out)
+{
+  Origin origin = Origin::fromInput(out.source);
   bool sent = false;
-  switch (msg.source) {
+  switch (out.source) {
     case MidiSource::Usb:
       if (config.usbToDin) {
         _outputs->send(MidiOutput::Din, out, origin);
