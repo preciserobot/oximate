@@ -300,4 +300,32 @@ KeyEstimate estimateKey(const float weights[12])
   }
   return best;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Scales
+
+const Scale kScales[kScaleCount] = {
+    {"Chromatic", 0xFFF},
+    {"Major", 0xAB5},          // 0 2 4 5 7 9 11
+    {"Minor", 0x5AD},          // 0 2 3 5 7 8 10
+    {"Dorian", 0x6AD},         // 0 2 3 5 7 9 10
+    {"Phrygian", 0x5AB},       // 0 1 3 5 7 8 10
+    {"Harm. minor", 0x9AD},    // 0 2 3 5 7 8 11
+    {"Minor pent.", 0x4A9},    // 0 3 5 7 10
+    {"Major pent.", 0x295},    // 0 2 4 7 9
+};
+
+uint8_t quantise(uint8_t note, uint8_t rootPc, uint16_t scaleMask)
+{
+  if (!(scaleMask & 0xFFF)) return note;
+  for (int distance = 0; distance < 12; distance++) {
+    for (int side = 0; side < 2; side++) { // down first: ties go down
+      int candidate = note + (side ? distance : -distance);
+      if (candidate < 0 || candidate > 127) continue;
+      int degree = ((candidate - rootPc) % 12 + 12) % 12;
+      if (scaleMask & (1 << degree)) return candidate;
+    }
+  }
+  return note;
+}
 } // namespace MusicTheory

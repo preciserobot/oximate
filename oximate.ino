@@ -37,6 +37,8 @@
 #include "src/ear_page.h"
 #include "src/drum_machine.h"
 #include "src/drum_page.h"
+#include "src/gen_engine.h"
+#include "src/gen_page.h"
 #include "src/input_observers.h"
 #include "src/leds.h"
 #include "src/midi_outputs.h"
@@ -64,6 +66,7 @@ Panic panic;             // runs in the MIDI task; requested from the UI
 Stats stats;             // written by the MIDI task, read by the Diagnostics page
 SamSynth samSynth;       // runs in the MIDI task; settings from the Synth page
 DrumMachine drumMachine; // plays in the MIDI task on clock steps; edited on the Drums page
+GenEngine genEngine;     // stage 12: generators in the MIDI task; edited on the Gen page
 
 // UI side: Arduino loop() (core 1)
 Leds leds;
@@ -73,6 +76,7 @@ RouterPage routerPage(router, leds, clockEngine);
 SpeakerSynth speakerSynth;
 SynthPage synthPage(samSynth, speakerSynth);
 DrumPage drumPage(drumMachine, clockEngine, leds);
+GenPage genPage(genEngine, leds);
 ClockPage clockPage(clockEngine, leds);
 EarPage earPage(samSynth, speakerSynth, leds); // stage 7: ear trainer + chord explorer
 ChordInput chordInput;       // stage 21: held input notes, kept by an observer in the MIDI task
@@ -100,6 +104,7 @@ void midiTaskLoop(uint32_t nowMillis)
   panic.run(nowMillis);
   samSynth.run(nowMillis);
   drumMachine.run(nowMillis);
+  genEngine.run(nowMillis);
   chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
 }
@@ -121,6 +126,7 @@ void setup()
   router.begin(outputs, clockEngine);
   samSynth.begin(outputs);
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
+  genEngine.begin(outputs, clockEngine);   // clock listener
   ClockSource oldClock;
   if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
     static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
@@ -152,6 +158,7 @@ void setup()
   ui.addPage(routerPage);
   ui.addPage(synthPage);
   ui.addPage(drumPage);
+  ui.addPage(genPage);
   ui.addPage(clockPage);
   ui.addPage(analyserPage);
   earPage.begin();
@@ -292,6 +299,7 @@ void loop()
   chordDetector.update(chordInput.snapshot(), millis()); // also off-page, so the history keeps up
   chordPage.poll();
   drumMachine.poll();
+  genEngine.poll();
   // Drum hits also play on the built-in speaker when the Synth page's output is the speaker
   uint8_t drumNote, drumVelocity;
   while (drumMachine.takeHit(drumNote, drumVelocity)) {

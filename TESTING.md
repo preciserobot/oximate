@@ -182,6 +182,25 @@ background; A resets them.
 - [ ] Unplugging the USB keyboard while holding notes clears them; a panic clears them
 - [ ] Settings survive a power cycle
 
+## 12. Generative sequencers (stage 12)
+
+Clock running (Clock page), Elektron or headphones on the SAM2695. Slots start muted.
+
+- [ ] Gen page appears after Drums; 8 slots, 1–4 preset (two Euclid, Turing, Mod), 5–8 off
+- [ ] Unmute slot 1 (tap its chip or B): four on the floor on channel 10 (SAM2695 drum kit)
+- [ ] Slot 2 hats (7 over 16) play against it; the list preview shows the playhead moving
+- [ ] Edit a Euclid slot (tap its preview): steps, hits, rotation change the rhythm live
+- [ ] Two Euclid slots with different step counts drift against each other and realign (hold A, next bar)
+- [ ] Turing slot (channel 3 → a synth or the SAM2695): locked repeats exactly; unlocked (B) slowly changes; hold B reseeds
+- [ ] Turing notes stay in the chosen scale and range
+- [ ] Mod lane (channel 3, CC 74) moves a filter smoothly; S&H steps; Min/Max limit it
+- [ ] Rates 1/8, 1/4, 1/32, 1/16T sound right; 1/16 follows the Clock page's swing
+- [ ] Stop: no hanging notes; Start: every slot begins at step 1
+- [ ] Drums page, Pattern view: Euclid fill writes hits into the selected lane
+- [ ] LEDs show the Euclid ring / Turing note / mod value of the selected slot
+- [ ] Settings survive a power cycle
+  > Diag page DIN drops with all slots busy plus drums:
+
 ## Other notes
 
 >

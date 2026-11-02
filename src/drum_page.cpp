@@ -1,6 +1,7 @@
 #include "drum_page.h"
 
 #include "drum_kits.h"
+#include "euclid.h"
 
 using namespace Layout;
 
@@ -19,6 +20,7 @@ static constexpr int kSoundChipsY = 170;
 // Pattern view
 static constexpr int kSlotX = 2, kSlotY = 26, kSlotW = 48, kSlotH = 34;
 static constexpr int kSideX = 200;
+static constexpr int kFillY = 144, kFillH = 24;
 
 static constexpr uint32_t kHitFlashMillis = 80;
 
@@ -256,6 +258,11 @@ void DrumPage::touchPattern(int x, int y)
     _drums.setChain(_chain, 0);
   } else if (y >= 112 && y < 136) {
     _drums.clearPattern(pattern);
+  } else if (y >= kFillY && y < kFillY + kFillH) { // Euclid fill: - / apply / +
+    int length = _drums.bank().patterns[pattern].length;
+    if (x < kSideX + 30) _fillHits = _fillHits > 0 ? _fillHits - 1 : 0;
+    else if (x >= 320 - 30) _fillHits = _fillHits < length ? _fillHits + 1 : length;
+    else _drums.fillEuclid(pattern, _lane, _fillHits);
   } else {
     return;
   }
@@ -418,6 +425,13 @@ void DrumPage::drawPattern()
   drawChip(c, 320 - 40, 46, 40, 26, "+", true);
   drawChip(c, kSideX, 80, 120, 24, _chainEdit ? "Chain: on" : "Chain: off", _chainEdit);
   drawChip(c, kSideX, 112, 120, 24, "Clear pattern", true, TFT_MAROON);
+  // Euclid fill of the lane selected in the Grid / Sound views: tap the middle to write it
+  char lane[4];
+  laneLabel(bank.lanes[_lane].note, lane, sizeof(lane));
+  snprintf(text, sizeof(text), "%s E%d", lane, _fillHits);
+  drawChip(c, kSideX, kFillY, 30, kFillH, "-", true);
+  drawChip(c, kSideX + 30, kFillY, 60, kFillH, text, true);
+  drawChip(c, 320 - 30, kFillY, 30, kFillH, "+", true);
 
   int n = snprintf(text, sizeof(text), "Chain:");
   if (!bank.chainLength) {

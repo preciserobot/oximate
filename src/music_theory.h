@@ -118,6 +118,34 @@ int detectChords(uint16_t pcs, uint8_t bass, ScoredChord *out, int maxOut);
 /*! Lead-sheet name: "C", "Cm7", "Cmaj7/E", "C5" */
 void leadSheetName(const ScoredChord &chord, char *out, size_t size, bool flats = false);
 
+// ---------------------------------------------------------------------------------------------
+// Scales (stage 12 generators; stage 11 effects will use them too). Masks are pitch-class sets
+// on root 0.
+
+enum ScaleId : uint8_t
+{
+  ScaleChromatic,
+  ScaleMajor,
+  ScaleMinor,
+  ScaleDorian,
+  ScalePhrygian,
+  ScaleHarmonicMinor,
+  ScaleMinorPentatonic,
+  ScaleMajorPentatonic,
+  kScaleCount,
+};
+
+struct Scale
+{
+  const char *name;
+  uint16_t mask; ///< bit n = n semitones above the root is in the scale
+};
+
+extern const Scale kScales[kScaleCount];
+
+/*! The scale note nearest to `note` (ties go down), for a scale on pitch class `rootPc` */
+uint8_t quantise(uint8_t note, uint8_t rootPc, uint16_t scaleMask);
+
 /*! Krumhansl-Schmuckler key estimate from pitch-class weights */
 struct KeyEstimate
 {

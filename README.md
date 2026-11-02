@@ -29,7 +29,7 @@ synth.
 | 9 | [Clock analyser](#stage-9-clock-analyser) | ✅ | needs hardware test |
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | — | planned (full plan) |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | planned (full plan) |
-| 12 | [Generative sequencers](#stage-12-generative-sequencers) | — | planned (full plan) |
+| 12 | [Generative sequencers](#stage-12-generative-sequencers) | ✅ | needs hardware test |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | — | planned (full plan) |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | planned (full plan) |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | planned (full plan) |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Drums → Clock → Analyse → Ear → Chord → Diag → Monitor.
+  Router → Synth → Drums → Gen → Clock → Analyse → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -123,6 +123,8 @@ the USB Host Module.
 | Router | All channels on | LED brightness | Default settings |
 | Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
 | Drums | Play / Stop (following an external clock: Arm / Disarm) | Mute lane (hold: solo); Sound view: audition | Next view (Grid → Sound → Pattern) |
+| Gen (list) | Previous slot (hold: realign all slots on the next bar) | Mute (Turing: lock / unlock; hold: reseed; Euclid hold: new rotation) | Next slot |
+| Gen (edit) | − selected setting (hold: repeat) | as in the list | + selected setting (hold: repeat) |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
@@ -682,6 +684,37 @@ Euclid can also fill a drum lane. Shared note handling moves to
 `src/step_voice.*`.
 **Full plan:** [docs/stages/stage-12.md](docs/stages/stage-12.md)
 
+**Implemented (2026-11-02):**
+
+* **Gen page** (after Drums), 8 slots. The list shows each slot's kind, channel, a live
+  preview (Euclid steps with the playhead, Turing's next notes, the mod value) and a mute
+  chip. Tap the kind to cycle off / EUC / TUR / MOD, tap the preview to edit. The edit view is
+  a two-column table of the slot's settings (tap one, A / C = − / +).
+* **Euclid:** steps 1–32, hits, rotation, note, velocity, gate, probability, and an accent
+  Euclid (+27 velocity). Slots loop over their own length (polymeter).
+* **Turing:** a 2–16 value register with mutation (0 % = repeats exactly), lock, reseed,
+  scale (8 scales added to `music_theory` with `quantise()`), root, octave, range and
+  density (rests from the same register). Seeded xorshift32, so a seed reproduces its loop.
+* **Mod lanes:** CC with S&H, smooth random, sine, triangle, ramps or square over 1 step to
+  64 bars, min / max (inverted when max < min), sent only when the value changes.
+* **Rates:** 1/16, 1/8 and 1/4 follow the clock's swung steps; 1/32 and 1/16T count clock
+  ticks and stay straight.
+* Transport comes from the clock. Stop releases every generator note; mod lanes stay where
+  they are. Hold A realigns all slots on the next bar.
+* **Drums page, Pattern view:** an Euclid fill for the lane selected in the Grid or Sound
+  view (`−` / `+` set the hits, tap the middle to write them; accents on hits are kept).
+* LEDs while the page is open: the Euclid ring (≤ 10 steps all shown, else the 10 around the
+  playhead), Turing's current note colour plus lock state, or a mod-value bar.
+* Settings are saved in NVS (`gen`, v1) 2 s after the last edit, only while stopped.
+* **Defaults until the open questions are answered:** every slot starts muted; slot 1 is a
+  four-on-the-floor Euclid on channel 10 note 36, slot 2 hats (7 over 16, note 42), slot 3 a
+  Turing sequence on channel 3 (C minor, octave 3), slot 4 a sine mod lane on channel 3 CC 74;
+  slots 5–8 are off. All output to DIN.
+* **Deviations from the plan:** no Euclid ring drawing on screen (the LED bar shows it);
+  no "Write" (stored loop) action: only the seed is saved, so a mutated loop isn't kept
+  across power cycles; no undo for the drum Euclid fill, and it uses rotation 0; 1/16T and
+  1/32 aren't swung.
+
 ### Stage 13: Recorder / looper
 
 Record the merged stream into PSRAM, then save it to the SD card as `.mid`
@@ -948,6 +981,11 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/synth_page.*`  | the Synth page and instrument browser |
 | `src/drum_machine.*` | drum machine: patterns, playback on clock steps, pad controller input |
 | `src/drum_page.*`   | the Drums page (Grid, Sound and Pattern views) |
+| `src/step_voice.*`  | note-on, gated note-off via the clock scheduler, release on stop (drums and Gen) |
+| `src/euclid.h`      | Euclidean rhythm masks |
+| `src/gen_core.*`    | seeded RNG, Turing register, mod-lane shapes (pure, host-tested) |
+| `src/gen_engine.*`  | stage 12 generators: 8 slots on the clock in the MIDI task |
+| `src/gen_page.*`    | the Gen page (slot list and edit view) |
 | `src/drum_kits.h`   | GM percussion note names |
 | `src/gm_names.h`    | GM instrument names, families, drum kits |
 | `src/music_theory.*` | note names, intervals, chords, scales; exact matching (stage 7), scored extended-chord matching and key estimate (stage 21) |

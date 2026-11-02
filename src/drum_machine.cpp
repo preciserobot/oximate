@@ -3,8 +3,8 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+#include "euclid.h"
 #include "input_observers.h"
-#include "note_tracker.h"
 #include "platform_time.h"
 
 static const char *const kNamespace = "oximate";
@@ -15,6 +15,7 @@ void DrumMachine::begin(MidiOutputs &outputs, ClockEngine &clock)
 {
   _outputs = &outputs;
   _clock = &clock;
+  _voice.begin(outputs, clock, kOwner);
   load();
   clock.addListener(onClock, this);
   InputHooks::addInterceptor(onInput, this);
@@ -70,6 +71,18 @@ void DrumMachine::clearPattern(int pattern)
     uint8_t length = _bank.patterns[pattern].length;
     _bank.patterns[pattern] = DrumPattern();
     _bank.patterns[pattern].length = length;
+  }
+  changed();
+}
+
+void DrumMachine::fillEuclid(int pattern, int lane, int hits, int rotation)
+{
+  {
+    CriticalGuard guard(_lock);
+    DrumPattern &p = _bank.patterns[pattern];
+    uint32_t mask = euclid(p.length, hits, rotation);
+    p.on[lane] = mask;
+    p.accent[lane] &= mask;
   }
   changed();
 }
@@ -182,31 +195,11 @@ void DrumMachine::pushHit(uint8_t note, uint8_t velocity)
   _hitHead.store(next, std::memory_order_release);
 }
 
-void DrumMachine::send(const uint8_t *bytes, uint16_t length)
-{
-  MidiMessage msg = {MidiSource::Din, 0, bytes, length};
-  _outputs->send(MidiOutput::Din, msg, Origin::internal(kOwner));
-  if (_bank.usbOut && _outputs->available(MidiOutput::Usb)) {
-    _outputs->send(MidiOutput::Usb, msg, Origin::internal(kOwner));
-  }
-}
-
-void DrumMachine::noteOffCallback(void *ctx, uint32_t note, uint64_t)
-{
-  DrumMachine *drums = static_cast<DrumMachine *>(ctx);
-  uint8_t off[3] = {(uint8_t)(0x80 | (drums->_bank.channel - 1)), (uint8_t)note, 0};
-  drums->send(off, 3);
-}
-
 /*! Note-on, and a note-off half a step later (the GM kit ignores it, external drums need it) */
 void DrumMachine::trigger(uint8_t note, uint8_t velocity, uint64_t timeUs, bool scheduleOff)
 {
-  uint8_t on[3] = {(uint8_t)(0x90 | (_bank.channel - 1)), note, velocity};
-  send(on, 3);
+  _voice.note(outputs(), _bank.channel, note, velocity, timeUs, scheduleOff ? _stepUs / 2 : 0);
   pushHit(note, velocity);
-  if (scheduleOff && !_clock->schedule(timeUs + _stepUs / 2, noteOffCallback, this, note)) {
-    noteOffCallback(this, note, timeUs); // scheduler full: end it now rather than never
-  }
 }
 
 bool DrumMachine::laneAudible(int lane) const
@@ -253,13 +246,6 @@ void DrumMachine::advance()
   _position = 0;
 }
 
-void DrumMachine::releaseAll()
-{
-  Origin origin = Origin::internal(kOwner);
-  _outputs->tracker().release(*_outputs, MidiOutput::Din, &origin);
-  _outputs->tracker().release(*_outputs, MidiOutput::Usb, &origin);
-}
-
 void DrumMachine::onClock(const ClockEvent &event, void *ctx)
 {
   DrumMachine *drums = static_cast<DrumMachine *>(ctx);
@@ -280,7 +266,7 @@ void DrumMachine::onClock(const ClockEvent &event, void *ctx)
       break;
     case ClockEvent::Stop:
       drums->_playing = false;
-      drums->releaseAll();
+      drums->_voice.releaseAll();
       break;
     case ClockEvent::Locate: {
       int length = drums->_bank.patterns[drums->_pattern].length;
@@ -317,8 +303,7 @@ bool DrumMachine::onInput(const MidiMessage &msg, void *ctx)
   if (lane < 0) return false;
 
   if (type == 0x80 || velocity == 0) {
-    uint8_t off[3] = {(uint8_t)(0x80 | (bank.channel - 1)), note, 0};
-    drums->send(off, 3);
+    drums->_voice.noteOff(drums->outputs(), bank.channel, note);
     return true;
   }
   drums->trigger(note, velocity, nowMicros64(), false); // the pad's own note-off ends it

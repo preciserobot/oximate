@@ -3,6 +3,7 @@
 #include <atomic>
 #include "clock_engine.h"
 #include "midi_outputs.h"
+#include "step_voice.h"
 #include "sync.h"
 
 enum class DrumStep : uint8_t
@@ -80,6 +81,9 @@ public:
   void setLane(int lane, const DrumLane &settings);
   void setLength(int pattern, uint8_t length);
   void clearPattern(int pattern);
+  /*! Euclid fill (stage 12): `hits` spread evenly over the pattern's length into one lane,
+   *  keeping accents that land on hits */
+  void fillEuclid(int pattern, int lane, int hits, int rotation = 0);
   void setPadChannel(uint8_t channel);
   void setUsbOut(bool on);
   void setChain(const uint8_t *patterns, uint8_t length); ///< length 0 = chain off
@@ -105,14 +109,12 @@ public:
   void run(uint32_t nowMillis); ///< loop hook: auditions
   static void onClock(const ClockEvent &event, void *ctx);
   static bool onInput(const MidiMessage &msg, void *ctx);
-  static void noteOffCallback(void *ctx, uint32_t note, uint64_t timeUs);
 
 private:
   void playStep(uint64_t timeUs);
   void advance();
   void trigger(uint8_t note, uint8_t velocity, uint64_t timeUs, bool scheduleOff);
-  void send(const uint8_t *bytes, uint16_t length);
-  void releaseAll();
+  uint8_t outputs() const { return StepVoice::ToDin | (_bank.usbOut ? StepVoice::ToUsb : 0); }
   bool laneAudible(int lane) const;
   void pushHit(uint8_t note, uint8_t velocity);
   void changed();
@@ -121,6 +123,7 @@ private:
 
   MidiOutputs *_outputs = nullptr;
   ClockEngine *_clock = nullptr;
+  StepVoice _voice;
   DrumBank _bank;
   mutable CriticalSection _lock; // step bits written by the UI and by recording in the MIDI task
 
