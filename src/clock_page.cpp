@@ -22,6 +22,11 @@ static constexpr int kBeatsY = 124;
 static constexpr int kClockChipX = 88, kTransportChipX = 160, kRatioChipX = 240;
 static constexpr int kClockChipW = 70, kTransportChipW = 78, kRatioChipW = 76;
 
+// Cues view rows (stage 10)
+static constexpr int kCueRowY = 26, kCueRowH = 20;
+static constexpr int kCueChipX = 196, kCueChipW = 122;
+static constexpr int kCueSettingsY = 190;
+
 static constexpr uint32_t kDynamicMillis = 50; // redraw rate of the digits and position
 static constexpr float kImuTapG = 1.5f;        // spike above the baseline that counts as a tap
 static constexpr uint32_t kImuDeadMicros = 150000;
@@ -43,26 +48,34 @@ static float roundBpm(float bpm)
 
 void ClockPage::buttonLabels(const char *labels[3]) const
 {
-  labels[0] = _clock.snapshot().running ? "Stop" : "Start";
-  labels[1] = "Tap";
-  labels[2] = _outputsView ? "Main" : "Outputs";
+  labels[0] = _clock.snapshot().running || _countInLeft ? "Stop" : "Start";
+  labels[1] = _view == View::Cues ? "Test" : "Tap";
+  labels[2] = _view == View::Main ? "Outputs" : (_view == View::Outputs ? "Cues" : "Main");
 }
 
 void ClockPage::onButton(int index)
 {
   switch (index) {
     case 0:
-      if (_clock.snapshot().running) {
+      if (_countInLeft) {
+        _countInLeft = 0; // cancel the count-in
+      } else if (_clock.snapshot().running) {
         _clock.stop();
+      } else if (_haptics.config().countInBars && _clock.config().mode == ClockMode::Internal) {
+        startCountIn();
       } else {
         _clock.start();
       }
       break;
     case 1:
-      tapNow(micros());
+      if (_view == View::Cues) {
+        _haptics.test(); // every pattern once, in priority order
+      } else {
+        tapNow(micros());
+      }
       break;
     case 2:
-      _outputsView = !_outputsView;
+      _view = _view == View::Main ? View::Outputs : (_view == View::Outputs ? View::Cues : View::Main);
       _partial = false;
       markDirty();
       break;
@@ -98,7 +111,11 @@ void ClockPage::onTouch(int x, int y)
   ClockConfig &c = _clock.config();
   auto inRow = [y](int top) { return y >= top && y < top + kChipHeight; };
 
-  if (_outputsView) {
+  if (_view == View::Cues) {
+    cuesTouch(x, y);
+    return;
+  }
+  if (_view == View::Outputs) {
     for (int o = 0; o < 2; o++) {
       if (!inRow(kOutputRowY[o])) continue;
       ClockOutputConfig &output = c.outputs[o];
@@ -159,6 +176,7 @@ void ClockPage::enter()
 
 void ClockPage::leave()
 {
+  _countInLeft = 0; // a count-in only runs while the page is open
   _visible = false;
   _leds.release(kLedOwner);
 }
@@ -166,17 +184,17 @@ void ClockPage::leave()
 void ClockPage::draw()
 {
   _shown = _clock.snapshot();
-  if (_partial && !_outputsView) {
+  if (_partial && _view == View::Main) {
     _partial = false;
     drawDynamic(); // digits and position only: no flicker on every beat
     return;
   }
   _partial = false;
   canvas().fillRect(0, kContentTop, canvas().width(), kContentHeight, TFT_BLACK);
-  if (_outputsView) {
-    drawOutputs();
-  } else {
-    drawMain();
+  switch (_view) {
+    case View::Main:    drawMain(); break;
+    case View::Outputs: drawOutputs(); break;
+    default:            drawCues(); break;
   }
 }
 
@@ -284,8 +302,20 @@ void ClockPage::tick()
     markFooterDirty();
   }
 
+  // Count-in: one cue per beat at the set tempo, then Start on what would be the next downbeat
+  if (_countInLeft && (int32_t)(micros() - _countInNext) >= 0) {
+    _countInLeft--;
+    if (_countInLeft) {
+      Cues::post(_countInLeft == 1 ? Cue::CountInLast : Cue::CountIn);
+      _countInNext += _countInPeriod;
+    } else {
+      _clock.start();
+    }
+    markFooterDirty();
+  }
+
   static uint32_t lastDraw = 0;
-  if (_outputsView || millis() - lastDraw < kDynamicMillis) {
+  if (_view != View::Main || millis() - lastDraw < kDynamicMillis) {
     return;
   }
   // Redraw when anything visible changed (tempo to 0.1, position, transport, sync state)
@@ -339,5 +369,76 @@ void ClockPage::pollImu()
   if (magnitude - _baseline > kImuTapG && now - _lastTapMicros > kImuDeadMicros) {
     _lastTapMicros = now;
     tapNow(now);
+  }
+}
+
+// ---------------------------------------------------------------------------- Cues view (stage 10)
+
+static const char *const kGroupNames[(int)CueGroup::Count] = {"Metronome",  "Clock alerts", "Phrase (st.22)",
+                                                              "Feel the kick", "Touch tick", "Panic done",
+                                                              "Ear answers",   "Low battery"};
+static const char *const kOutputNames[] = {"Off", "Vibrate", "Click", "Both"};
+static const uint8_t kStrengths[] = {110, 135, 160, 185, 210, 235};
+static const uint8_t kLeads[] = {0, 10, 20, 25, 30, 40, 50};
+static const uint8_t kKickNotes[] = {35, 36};
+
+template <typename T, size_t N> static T nextIn(const T (&values)[N], T current)
+{
+  size_t i = 0;
+  while (i < N && values[i] != current) i++;
+  return values[(i + 1) % N];
+}
+
+void ClockPage::startCountIn()
+{
+  ClockEngine::Snapshot snap = _clock.snapshot();
+  uint8_t beatsPerBar = _clock.config().beatsPerBar ? _clock.config().beatsPerBar : 4;
+  _countInPeriod = (uint32_t)(60e6f / _clock.config().bpm);
+  // One cue now and one per beat; the clock starts one beat after the last
+  _countInLeft = _haptics.config().countInBars * beatsPerBar + 1;
+  _countInNext = micros();
+  (void)snap;
+}
+
+void ClockPage::cuesTouch(int x, int y)
+{
+  HapticConfig &h = _haptics.config();
+  if (y >= kCueRowY && y < kCueRowY + (int)CueGroup::Count * kCueRowH && x >= kCueChipX) {
+    int group = (y - kCueRowY) / kCueRowH;
+    h.outputs[group] = (CueOutput)(((int)h.outputs[group] + 1) % 4);
+  } else if (y >= kCueSettingsY && y < kCueSettingsY + kChipHeight) {
+    switch (x / kQuarter) {
+      case 0: h.strength = nextIn(kStrengths, h.strength); break;
+      case 1: h.leadMillis = nextIn(kLeads, h.leadMillis); break;
+      case 2: h.kickNote = nextIn(kKickNotes, h.kickNote); break;
+      default: h.countInBars = (h.countInBars + 1) % 3; break;
+    }
+  } else {
+    return;
+  }
+  _haptics.changed();
+  markDirty();
+}
+
+void ClockPage::drawCues()
+{
+  const HapticConfig &h = _haptics.config();
+  M5Canvas &c = canvas();
+  for (int group = 0; group < (int)CueGroup::Count; group++) {
+    int y = kCueRowY + group * kCueRowH;
+    c.setTextColor(TFT_WHITE, TFT_BLACK);
+    c.setCursor(4, y + 2);
+    c.print(kGroupNames[group]);
+    drawChip(c, kCueChipX, y, kCueChipW, kCueRowH, kOutputNames[(int)h.outputs[group]],
+             h.outputs[group] != CueOutput::Off);
+  }
+  char text[4][12];
+  snprintf(text[0], sizeof(text[0]), "Str %u", h.strength);
+  snprintf(text[1], sizeof(text[1]), "Lead %u", h.leadMillis);
+  snprintf(text[2], sizeof(text[2]), "Kick %u", h.kickNote);
+  if (h.countInBars) snprintf(text[3], sizeof(text[3]), "Cnt %u bar", h.countInBars);
+  else strcpy(text[3], "Cnt off");
+  for (int i = 0; i < 4; i++) {
+    drawChip(c, i * kQuarter, kCueSettingsY, kQuarter, kChipHeight, text[i], i < 3 || h.countInBars);
   }
 }

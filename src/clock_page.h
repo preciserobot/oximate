@@ -1,6 +1,7 @@
 #pragma once
 
 #include "clock_engine.h"
+#include "haptics.h"
 #include "leds.h"
 #include "tap_tempo.h"
 #include "ui.h"
@@ -10,7 +11,7 @@
 class ClockPage : public Page
 {
 public:
-  ClockPage(ClockEngine &clock, Leds &leds) : _clock(clock), _leds(leds) {}
+  ClockPage(ClockEngine &clock, Leds &leds, Haptics &haptics) : _clock(clock), _leds(leds), _haptics(haptics) {}
 
   const char *title() const override { return "Clock"; }
   void buttonLabels(const char *labels[3]) const override;
@@ -31,14 +32,28 @@ private:
   void drawMain();
   void drawDynamic();
   void drawOutputs();
+  void drawCues();
+  void cuesTouch(int x, int y);
+  void startCountIn();
   void changed();
   void tapNow(uint32_t micros);
   void renderLeds(const ClockEngine::Snapshot &snap);
 
   ClockEngine &_clock;
   Leds &_leds;
+  Haptics &_haptics;
   TapTempo _tap;
-  bool _outputsView = false;
+  /// C cycles Main -> Outputs -> Cues (stage 10 haptic settings)
+  enum class View : uint8_t
+  {
+    Main,
+    Outputs,
+    Cues,
+  } _view = View::Main;
+  // Count-in before Start (local cues only, no MIDI)
+  uint32_t _countInNext = 0;
+  uint32_t _countInPeriod = 0;
+  uint8_t _countInLeft = 0;
   bool _visible = false;
   bool _partial = false; // next draw() only updates digits and position
   bool _labelRunning = false; // transport state shown on the A button

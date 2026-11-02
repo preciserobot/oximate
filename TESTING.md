@@ -182,6 +182,24 @@ background; A resets them.
 - [ ] Unplugging the USB keyboard while holding notes clears them; a panic clears them
 - [ ] Settings survive a power cycle
 
+## 11. Haptic cues (stage 10)
+
+Clock page, C until the Cues view. Default: metronome vibrates.
+
+- [ ] Start the internal clock: the motor taps on every beat, longer on beat 1
+  > Does the tap feel on the beat, early, or late? (Lead setting on the Cues view)
+- [ ] Cues view, B (Test): every pattern plays once; they feel different from each other
+- [ ] Metronome set to Click: a click on the speaker instead; Both: tap and click
+- [ ] Str: lower strength is softer; at 110 still noticeable?
+- [ ] Count-in 1 bar: Start gives 4 taps (last one longer), then the clock starts on the next beat
+- [ ] Following the Elektron's clock: unplugging it gives one long buzz (clock lost); plugging it back a quick double (locked again)
+- [ ] Feel the kick on (channel 10, note 36): kicks from a drum machine are felt; snares aren't
+- [ ] Touch tick on: a light tick on every button press and tap
+- [ ] Panic (power button): a long pulse when it's done
+- [ ] Ear trainer: right answer one tap, wrong answer three
+- [ ] Settings survive a power cycle
+- [ ] Screen redraws (e.g. Monitor while playing) don't make the metronome stumble
+
 ## 12. Generative sequencers (stage 12)
 
 Clock running (Clock page), Elektron or headphones on the SAM2695. Slots start muted.

@@ -91,6 +91,7 @@ void Ui::pushContent()
     M5.Display.setClipRect(0, top, M5.Display.width(), bottom - top);
     _content.pushSprite(0, 0);
     M5.Display.clearClipRect();
+    if (_serviceHook) _serviceHook();
   }
 }
 
@@ -131,6 +132,7 @@ void Ui::poll()
   m5::Button_Class *buttons[3] = {&M5.BtnA, &M5.BtnB, &M5.BtnC};
   for (int i = 0; i < 3; i++) {
     if (buttons[i]->wasClicked()) {
+      if (_touchHook) _touchHook();
       page.onButton(i);
       _footerDirty = true;
     } else if (buttons[i]->wasHold()) {
@@ -153,6 +155,7 @@ void Ui::poll()
     }
   }
   if (touch.wasClicked() && touch.y < kFooterTop) {
+    if (_touchHook) _touchHook();
     if (touch.y < kHeaderTapHeight) {
       show((_current + 1) % _pageCount);
       Serial.printf("Page: %s\n", _pages[_current]->title());
