@@ -125,7 +125,7 @@ the USB Host Module.
 | Drums | Play / Stop (following an external clock: Arm / Disarm) | Mute lane (hold: solo); Sound view: audition | Next view (Grid → Sound → Pattern) |
 | Gen (list) | Previous slot (hold: realign all slots on the next bar) | Mute (Turing: lock / unlock; hold: reseed; Euclid hold: new rotation) | Next slot |
 | Gen (edit) | − selected setting (hold: repeat) | as in the list | + selected setting (hold: repeat) |
-| Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues |
+| Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues (hold: **cues on / off**, any view) |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Phrase | Reset (the current bar becomes bar 1) | Bar 1: tap on a downbeat, rounded to the nearest bar (hold: restart the phrase, keep the section count) | Normal / big view |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
@@ -664,7 +664,8 @@ cue group. The beat listener in the MIDI task schedules each next beat one
 period ahead minus the lead time. `Ui::pushContent()` services cues between
 its slices. The settings are a third view on the Clock page (C: Main →
 Outputs → Cues), saved in NVS under `haptic`. Defaults until you decide:
-metronome, clock alerts, phrase, panic, answers and battery vibrate; kick and
+**Cues are off by default** (master switch on the Cues view, or hold C on the Clock page;
+decided 2026-11-02). Once switched on: metronome, clock alerts, phrase, panic, answers and battery vibrate; kick and
 touch tick off; kick note 36 on channel 10; count-in off.
 
 Differences from the plan:

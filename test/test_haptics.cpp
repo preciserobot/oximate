@@ -30,6 +30,8 @@ TEST(testHapticPatterns)
   FakeMotor motor;
   Haptics haptics;
   haptics.begin(motor.output(), nullptr);
+  haptics.config().enabled = true; // cues are off by default
+  haptics.changed();
 
   // A beat: full level for 70 ms, then off (each level written once)
   Cues::post(Cue::Beat);
@@ -106,6 +108,8 @@ TEST(testHapticScheduling)
   FakeMotor motor;
   Haptics haptics;
   haptics.begin(motor.output(), &rig.clock);
+  haptics.config().enabled = true; // cues are off by default
+  haptics.changed();
 
   // A scheduled beat waits for its time, and is dropped when the clock isn't running then
   Cues::post(Cue::Beat, 1050000);
@@ -146,6 +150,8 @@ TEST(testHapticClockAlertsAndKick)
   FakeMotor motor;
   Haptics haptics;
   haptics.begin(motor.output(), &rig.clock);
+  haptics.config().enabled = true; // cues are off by default
+  haptics.changed();
 
   // Following DIN: lock, lose, lock again -> ClockLost, then ClockLocked
   rig.clock.config().mode = ClockMode::FollowDin;
@@ -192,4 +198,26 @@ TEST(testHapticClockAlertsAndKick)
   reloaded.begin(motor.output(), nullptr);
   CHECK(reloaded.config().strength == 150 && reloaded.config().outputs[(int)CueGroup::Kick] == CueOutput::Vibrate);
   drainCues();
+}
+
+TEST(testHapticsOffByDefault)
+{
+  gFakeNvs.clear();
+  FakeMotor motor;
+  Haptics haptics;
+  haptics.begin(motor.output(), nullptr);
+  CHECK(!haptics.config().enabled);
+  Cues::post(Cue::Beat);
+  Cues::post(Cue::PanicDone);
+  haptics.service(1000);
+  CHECK(motor.levels.empty() && !haptics.playing());
+  // Switched on: cues play; switched off again: the motor stops at once
+  haptics.config().enabled = true;
+  haptics.changed();
+  Cues::post(Cue::ClockLost);
+  haptics.service(2000);
+  CHECK(!motor.levels.empty() && motor.levels.back() > 0);
+  haptics.config().enabled = false;
+  haptics.changed();
+  CHECK(motor.levels.back() == 0 && !haptics.playing());
 }

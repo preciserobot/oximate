@@ -38,6 +38,8 @@ constexpr uint16_t kOffTextColor = TFT_LIGHTGREY;
 void drawChip(LovyanGFX &target, int x, int y, int w, int h, const char *text, bool on,
               uint16_t onColor = Layout::kOnColor);
 
+class Ui;
+
 /*! One screen of the UI. Touch buttons A/B/C belong to the active page. */
 class Page
 {
@@ -70,16 +72,19 @@ public:
   }
 
   void setCanvas(M5Canvas *canvas) { _canvas = canvas; }
+  void setUi(Ui *ui) { _ui = ui; }
 
 protected:
   void markDirty() { _dirty = true; }
   void markFooterDirty() { _footerDirty = true; }
   M5Canvas &canvas() { return *_canvas; }
+  Ui *ui() { return _ui; } ///< e.g. for header messages (Ui::flash)
 
 private:
   bool _dirty = true;
   bool _footerDirty = false;
   M5Canvas *_canvas = nullptr;
+  Ui *_ui = nullptr;
 };
 
 /*! Owns page switching (tap the header), the header/footer bars and redraw throttling */

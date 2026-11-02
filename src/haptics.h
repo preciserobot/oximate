@@ -32,10 +32,13 @@ enum class CueGroup : uint8_t
 /*! Haptic settings, persisted in NVS (key "haptic"). Bump kVersion when the layout changes. */
 struct HapticConfig
 {
-  static constexpr uint8_t kVersion = 1;
+  static constexpr uint8_t kVersion = 2;
 
   uint8_t version = kVersion;
-  // Defaults until the user decides (README stage 10): metronome vibrates, count-in stays local
+  /// Master switch, off by default (decided 2026-11-02): no vibration or click at all until the
+  /// user turns cues on (Cues view chip, or hold C on the Clock page)
+  bool enabled = false;
+  // Per group, used once enabled: metronome vibrates, count-in stays local
   CueOutput outputs[(int)CueGroup::Count] = {CueOutput::Vibrate, CueOutput::Vibrate, CueOutput::Vibrate,
                                               CueOutput::Off,     CueOutput::Off,     CueOutput::Vibrate,
                                               CueOutput::Vibrate, CueOutput::Vibrate};

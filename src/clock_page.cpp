@@ -23,9 +23,10 @@ static constexpr int kClockChipX = 88, kTransportChipX = 160, kRatioChipX = 240;
 static constexpr int kClockChipW = 70, kTransportChipW = 78, kRatioChipW = 76;
 
 // Cues view rows (stage 10)
-static constexpr int kCueRowY = 26, kCueRowH = 20;
+static constexpr int kCueMasterY = 24, kCueMasterH = 22;
+static constexpr int kCueRowY = 48, kCueRowH = 18;
 static constexpr int kCueChipX = 196, kCueChipW = 122;
-static constexpr int kCueSettingsY = 190;
+static constexpr int kCueSettingsY = 194;
 
 static constexpr uint32_t kDynamicMillis = 50; // redraw rate of the digits and position
 static constexpr float kImuTapG = 1.5f;        // spike above the baseline that counts as a tap
@@ -61,7 +62,8 @@ void ClockPage::onButton(int index)
         _countInLeft = 0; // cancel the count-in
       } else if (_clock.snapshot().running) {
         _clock.stop();
-      } else if (_haptics.config().countInBars && _clock.config().mode == ClockMode::Internal) {
+      } else if (_haptics.config().enabled && _haptics.config().countInBars &&
+                 _clock.config().mode == ClockMode::Internal) {
         startCountIn();
       } else {
         _clock.start();
@@ -86,7 +88,18 @@ void ClockPage::onButtonHold(int index)
 {
   if (index == 0 && !_clock.snapshot().running) {
     _clock.cont(); // long press while stopped: continue from the current position
+  } else if (index == 2) {
+    toggleCues(); // hold C in any Clock view: cues on / off on demand
   }
+}
+
+void ClockPage::toggleCues()
+{
+  HapticConfig &h = _haptics.config();
+  h.enabled = !h.enabled;
+  _haptics.changed();
+  if (ui()) ui()->flash(h.enabled ? "Cues ON" : "Cues OFF", h.enabled ? TFT_DARKGREEN : TFT_DARKGREY, 1200);
+  markDirty();
 }
 
 void ClockPage::tapNow(uint32_t micros)
@@ -403,6 +416,10 @@ void ClockPage::startCountIn()
 void ClockPage::cuesTouch(int x, int y)
 {
   HapticConfig &h = _haptics.config();
+  if (y >= kCueMasterY && y < kCueMasterY + kCueMasterH) {
+    toggleCues();
+    return;
+  }
   if (y >= kCueRowY && y < kCueRowY + (int)CueGroup::Count * kCueRowH && x >= kCueChipX) {
     int group = (y - kCueRowY) / kCueRowH;
     h.outputs[group] = (CueOutput)(((int)h.outputs[group] + 1) % 4);
@@ -424,13 +441,15 @@ void ClockPage::drawCues()
 {
   const HapticConfig &h = _haptics.config();
   M5Canvas &c = canvas();
+  drawChip(c, 0, kCueMasterY, 320, kCueMasterH, h.enabled ? "Cues ON  (hold C: off)" : "Cues OFF  (hold C: on)",
+           h.enabled);
   for (int group = 0; group < (int)CueGroup::Count; group++) {
     int y = kCueRowY + group * kCueRowH;
-    c.setTextColor(TFT_WHITE, TFT_BLACK);
+    c.setTextColor(h.enabled ? TFT_WHITE : TFT_DARKGREY, TFT_BLACK);
     c.setCursor(4, y + 2);
     c.print(kGroupNames[group]);
     drawChip(c, kCueChipX, y, kCueChipW, kCueRowH, kOutputNames[(int)h.outputs[group]],
-             h.outputs[group] != CueOutput::Off);
+             h.enabled && h.outputs[group] != CueOutput::Off);
   }
   char text[4][12];
   snprintf(text[0], sizeof(text[0]), "Str %u", h.strength);

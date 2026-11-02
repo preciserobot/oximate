@@ -76,6 +76,7 @@ void Ui::addPage(Page &page)
 {
   if (_pageCount < kMaxPages) {
     page.setCanvas(&_content);
+    page.setUi(this);
     _pages[_pageCount++] = &page;
   }
 }

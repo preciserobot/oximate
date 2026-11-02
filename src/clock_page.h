@@ -36,6 +36,7 @@ private:
   void cuesTouch(int x, int y);
   void startCountIn();
   void changed();
+  void toggleCues();
   void tapNow(uint32_t micros);
   void renderLeds(const ClockEngine::Snapshot &snap);
 

@@ -51,7 +51,12 @@ void Haptics::changed()
   _leadMillis = _config.leadMillis;
   _kickNote = _config.kickNote;
   _kickChannel = _config.kickChannel;
-  _kickOn = _config.outputs[(int)CueGroup::Kick] != CueOutput::Off;
+  _kickOn = _config.enabled && _config.outputs[(int)CueGroup::Kick] != CueOutput::Off;
+  if (!_config.enabled) {
+    _scheduledCount = 0; // switched off: drop pending cues and stop the motor
+    _playing = false;
+    setLevel(0);
+  }
   _dirty = true;
   _changedMillis = millis();
 }
@@ -96,6 +101,7 @@ void Haptics::setLevel(uint8_t level)
 
 void Haptics::start(const Cues::Item &item, uint32_t nowMicros)
 {
+  if (!_config.enabled && _testIndex < 0) return; // master switch off (the test sequence still plays)
   CueOutput output = _config.outputs[(int)groupOf(item.cue)];
   if (output == CueOutput::Off) return;
   // A scheduled beat that comes due after Stop is not felt

@@ -184,6 +184,10 @@ background; A resets them.
 
 ## 11. Haptic cues (stage 10)
 
+Cues are **off by default**: turn them on with the top chip of the Clock page's Cues view, or hold C on the Clock page.
+
+- [ ] After a fresh start nothing vibrates or clicks; hold C on the Clock page shows "Cues ON" and the metronome starts vibrating; hold C again stops it at once
+
 Clock page, C until the Cues view. Default: metronome vibrates.
 
 - [ ] Start the internal clock: the motor taps on every beat, longer on beat 1
