@@ -62,6 +62,9 @@
 #include "src/speaker_synth.h"
 #include "src/spi_bus.h"
 #include "src/synth_page.h"
+#include "src/sysex_capture.h"
+#include "src/sysex_page.h"
+#include "src/sysex_sender.h"
 #include "src/ui.h"
 #include "src/usb_midi.h"
 
@@ -102,6 +105,9 @@ PhraseTracker phraseTracker; // stage 22: counts bars in the MIDI task (ClockEng
 PhrasePage phrasePage(phraseTracker, leds);
 Looper looper;                                       // stage 13: runs in the MIDI task
 LooperPage looperPage(looper, clockEngine, leds);
+SysExCapture sysexCapture; // stage 14: SysEx tap in the MIDI task, buffer read by the UI
+SysExSender sysexSender;   // stage 14: streams .syx files in the MIDI task
+SysExPage sysexPage(sysexSender, sysexCapture, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
@@ -125,6 +131,7 @@ void midiTaskLoop(uint32_t nowMillis)
   genEngine.run(nowMillis);
   fxEngine.run();
   looper.run(nowMillis);
+  sysexSender.run(nowMillis);
   phraseTracker.run();
   chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
@@ -153,6 +160,7 @@ void setup()
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
   genEngine.begin(outputs, clockEngine);   // clock listener
   looper.begin(outputs, clockEngine, &phraseTracker); // clock listener, input observer, phrase hook
+  sysexSender.begin(dinMidi, usbMidi, &sysexCapture);
   ClockSource oldClock;
   if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
     static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
@@ -208,6 +216,8 @@ void setup()
   ui.addPage(analyserPage);
   ui.addPage(phrasePage);
   ui.addPage(looperPage);
+  sysexPage.begin(); // PSRAM buffers; the capture buffer goes to sysexCapture
+  ui.addPage(sysexPage);
   earPage.begin();
   ui.addPage(earPage);
   chordPage.begin();
@@ -217,6 +227,7 @@ void setup()
   InputHooks::addObserver(ClockAnalyser::observer, &clockAnalyser);
   InputHooks::addObserver(ChordInput::observer, &chordInput);
   InputHooks::addObserver(Haptics::kickObserver, &haptics);
+  sysexCapture.registerHooks(); // SysEx tap and the capture-only interceptor
   ui.setHooks([] { haptics.service(); }, [] { Cues::post(Cue::TouchTick); });
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
@@ -289,6 +300,7 @@ void handlePanic()
   }
   if (level) {
     panic.request(level);
+    sysexSender.cancel(); // a running SysEx send stops after its current message
     requestedAt = millis();
     ui.flash(level >= 3 ? "PANIC ALL" : "PANIC", TFT_RED, 1500);
     Serial.printf("Panic level %u requested\n", level);
@@ -370,6 +382,7 @@ void loop()
   samSynth.poll();
   phraseTracker.poll();
   looper.poll();
+  sysexPage.poll(); // idle capture end and SD results, on any page
   haptics.poll();
   checkBattery();
   earPage.poll();

@@ -279,6 +279,21 @@ Internal clock running (Clock page: Start), a keyboard on USB or DIN. The SD car
   > Diag system view "bus held" during a save:
 - [ ] Without an SD card: Save/Load show "No SD card", looping still works
 
+## 16. SysEx librarian (stage 14)
+
+Copy the files from `subH_sysex_user/` into a folder `/syx` on the SD card. The
+Subharmonicon on DIN OUT (Unit MIDI switch on Separate).
+
+- [ ] The SysEx page appears after Loop; the library lists the files in `/syx` (A/C move, the Dumps chip shows `/oximate/dumps`)
+- [ ] `subharmonicon_fw_version.syx`, Out:DIN, B (load), B (send): the Subharmonicon shows its firmware version on its LEDs
+- [ ] `subharmonicon_midi_ch2.syx`: the Subharmonicon then listens on channel 2 (and `..._ch1.syx` sets it back)
+- [ ] While a send runs, a held note or the drum machine waits until the message ends; the clock keeps going
+- [ ] Capture view: Start, then make a device dump SysEx (e.g. an Elektron's SysEx dump send): bytes and messages count up, the LEDs pulse red; it ends 2 s after the last byte
+  > Device, dump size and whether it was captured completely:
+- [ ] Save: a file appears in `/oximate/dumps` (Dumps chip in the library); sending it back restores the device
+- [ ] Hold B in the capture view sends the capture back without saving
+- [ ] Panic (power button) during a long send: it stops after the current message, nothing stuck
+
 ## Other notes
 
 >

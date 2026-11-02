@@ -4,6 +4,7 @@
 #include <SPI.h>
 #include <usbh_midi.h>
 
+#include "input_observers.h"
 #include "spi_bus.h"
 
 static USB Usb;
@@ -83,6 +84,44 @@ size_t UsbMidi::txSpace() const
   return kTxQueueLength - 1 - used;
 }
 
+size_t UsbMidi::sysExPartRoom() const
+{
+  // Each record: 3 header bytes plus 4 packet bytes per 3 SysEx bytes (+1 packet of rounding)
+  size_t space = txSpace();
+  if (space < 3 + 8) return 0;
+  size_t packets = (space - 3) / 4 - 1;
+  size_t bytes = packets * 3;
+  return bytes < kPacketRecordBytes ? bytes : kPacketRecordBytes;
+}
+
+void UsbMidi::sendSysExPart(const uint8_t *bytes, size_t length, uint8_t cable)
+{
+  if (!_connected || length == 0) return;
+  uint8_t packets[(kPacketRecordBytes / 3 + 1) * 4];
+  size_t used = 0;
+  uint8_t packet[4];
+  for (size_t i = 0; i < length && i < kPacketRecordBytes; i++) {
+    if (_packer.push(bytes[i], cable, packet)) {
+      memcpy(packets + used, packet, 4);
+      used += 4;
+    }
+  }
+  if (used == 0) return; // bytes wait in the packer for the next part
+  size_t queued = (_txHead + kTxQueueLength - _txTail) % kTxQueueLength;
+  if (kTxQueueLength - 1 - queued < used + 3) {
+    _counters.txDropped++;
+    return;
+  }
+  auto push = [this](uint8_t b) {
+    _tx[_txHead] = b;
+    _txHead = (_txHead + 1) % kTxQueueLength;
+  };
+  push(kPacketRecord);
+  push(used & 0xFF);
+  push(used >> 8);
+  for (size_t i = 0; i < used; i++) push(packets[i]);
+}
+
 /*! Send queued messages; called from poll() while holding the SPI bus */
 void UsbMidi::flushTx()
 {
@@ -99,7 +138,9 @@ void UsbMidi::flushTx()
     for (uint16_t i = 0; i < length; i++) {
       _txMessage[i] = pop();
     }
-    if (_txMessage[0] == 0xF0) {
+    if (cable == kPacketRecord) {
+      MidiDevice.SendRawData(length, _txMessage); // streamed SysEx, already packed
+    } else if (_txMessage[0] == 0xF0) {
       MidiDevice.SendSysEx(_txMessage, length, cable);
     } else {
       MidiDevice.SendData(_txMessage, cable);
@@ -143,10 +184,12 @@ void UsbMidi::parsePacket(const uint8_t *p, uint32_t timeMicros)
     case 0x1: // reserved (cable events)
       break;
     case 0x4: // SysEx starts or continues
+      InputHooks::sysex(MidiSource::Usb, midi, 3); // dumps of any size, past the assembly limit
       appendSysEx(midi, 3);
       break;
     case 0x5: // single byte: SysEx end (F7) or system common (tune request)
       if (midi[0] == 0xF7) {
+        InputHooks::sysex(MidiSource::Usb, midi, 1);
         appendSysEx(midi, 1);
         if (!_sysexOverflow) emit(cable, _sysex, _sysexLength, _sysexStart);
         _sysexLength = 0;
@@ -156,6 +199,7 @@ void UsbMidi::parsePacket(const uint8_t *p, uint32_t timeMicros)
       break;
     case 0x6: // SysEx ends with the following two bytes
     case 0x7: // SysEx ends with the following three bytes
+      InputHooks::sysex(MidiSource::Usb, midi, cin - 4);
       appendSysEx(midi, cin - 4);
       if (!_sysexOverflow) emit(cable, _sysex, _sysexLength, _sysexStart);
       _sysexLength = 0;

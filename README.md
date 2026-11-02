@@ -31,7 +31,7 @@ synth.
 | 11 | [MIDI effects](#stage-11-midi-effects) | ✅ | needs hardware test |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | ✅ | needs hardware test |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | ✅ | looper done (recorder to do); needs hardware test |
-| 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | planned (full plan) |
+| 14 | [SysEx librarian](#stage-14-sysex-librarian) | ✅ | needs hardware test |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | planned (full plan) |
 | 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
 | 17 | [BLE MIDI](#stage-17-ble-midi) | — | planned (full plan) |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Loop → Ear → Chord → Diag → Monitor.
+  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Loop → SysEx → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, a cyan `SPK` while the built-in speaker is the
   output, and on the right the battery level (green
@@ -130,6 +130,9 @@ the USB Host Module.
 | Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo, from the 4th tap; the big BPM digits are a tap target too (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues (hold: **cues on / off**, any view) |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Loop | Rec: arm (empty), disarm, cancel the first pass (hold: undo the last pass) | Playback on / off | Overdub on / off |
+| SysEx (library) | Selection up | Load the file (then B sends it, A goes back) | Selection down |
+| SysEx (send) | Back (while sending: cancel after the current message) | Send | |
+| SysEx (capture) | Start / stop capturing | Save to SD (hold: send the capture back) | Discard |
 | Phrase | Reset (the current bar becomes bar 1) | Bar 1: tap on a downbeat, rounded to the nearest bar (hold: restart the phrase, keep the section count) | Normal / big view |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
@@ -838,6 +841,38 @@ Send `.syx` files from the SD card and capture SysEx dumps from devices. The
 Subharmonicon files in `subH_sysex_user/` are the first test case.
 
 **Plan (2026-11-01):** Send `.syx` files from SD with gaps between messages (default 20 ms), streaming past the 1024-byte SysEx limit. Capture dumps from DIN or USB into PSRAM, ended after 2 s of silence and saved byte-exact. Every send names its output, and there's a warning before universal SysEx. Test case: the Subharmonicon files.
+**Implemented (2026-11-02)**, with these differences from the plan:
+
+* **Sending:** `.syx` files from `/syx` (or saved dumps from `/oximate/dumps`) are
+  loaded into PSRAM (up to 512 KB, 1024 messages) and split into messages;
+  stray bytes and an unfinished last message are skipped and reported. The
+  send job (`src/sysex_sender.*`) runs in the MIDI task and streams any length:
+  * DIN through `DinMidi::sendRaw()`: from F0 to F7 other non-realtime DIN
+    output waits in a 512-byte hold queue, clock still goes first;
+  * USB through `UsbMidi::sendSysExPart()`: ready-made USB-MIDI packets
+    (CIN 4, ending with 5/6/7) in the existing send queue.
+
+  The gap between messages (0–250 ms, default 20) is timed in the MIDI task
+  loop (1 ms resolution), not with the clock scheduler. Cancel and panic stop
+  after the current F7. Every send names its output (DIN, USB or both; the
+  page shows it before sending), and a broadcast warning appears for universal
+  SysEx to device 7F.
+* **Capture:** an `InputHooks` SysEx tap gets the raw bytes from both parsers,
+  past the 1024-byte assembly limit, into a 512 KB PSRAM buffer
+  (`src/sysex_capture.*`). It ends 2 s after the last byte, on Stop, or when
+  the buffer is full. "Capture only" (on by default) keeps SysEx from a
+  capturing input from being routed. Bytes arriving while (and 300 ms after)
+  we send are ignored, so a device echoing our own SysEx isn't captured.
+  Saved as `/oximate/dumps/<maker>-YYYYMMDD-HHMMSS.syx` (RTC set) or
+  `<maker>-NNNN.syx`. Hold B sends a capture back from PSRAM, also without an
+  SD card.
+* **Not built:** sub-folders in the library, "Send + capture" with request
+  files, remembering the output per folder (one output setting for all), a
+  file-size column in the list, and a settable clock. Buffers are 512 KB each
+  instead of 1 MB, to leave PSRAM for the looper.
+* Settings in NVS under `syx` (v1). The Subharmonicon files from
+  `subH_sysex_user/` go into `/syx` on the card (not in the repo).
+
 **Full plan:** [docs/stages/stage-14.md](docs/stages/stage-14.md)
 
 ### Stage 15: Setlist / scenes
@@ -1154,6 +1189,10 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/looper_page.*` | the Loop page and its file list |
 | `src/smf.*`         | Standard MIDI File writer and reader (type 0/1, rescaled to 96 PPQN) |
 | `src/sd_store.*`    | SD task on core 1: chunked file reads/writes under the bus lock, folder listing |
+| `src/syx_file.*`    | .syx splitting, manufacturer names, broadcast check, dump file names, USB SysEx packer |
+| `src/sysex_sender.*` | SysEx send job in the MIDI task: streaming to DIN/USB, gaps, cancel |
+| `src/sysex_capture.*` | SysEx capture from the input tap into PSRAM, idle end, capture-only |
+| `src/sysex_page.*`  | the SysEx page (library, send, capture) |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/local_sound.h` | copies generated notes (Gen, looper) to the speaker in speaker mode |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |

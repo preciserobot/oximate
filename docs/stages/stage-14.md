@@ -1,6 +1,6 @@
 # Stage 14: SysEx librarian
 
-> **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
+> **Status: implemented 2026-11-02 (see the README stage 14 section for differences).** Written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 > SD card access reuses stage 13's design (`src/sd_store.*`, see
 > [stage-13.md, "SD card on the shared SPI bus"](stage-13.md#sd-card-on-the-shared-spi-bus)):
