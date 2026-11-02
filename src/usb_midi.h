@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include "midi_message.h"
+#include "syx_file.h"
 
 /*! USB MIDI device attached to the M5Stack USB host module (MAX3421E).
  *  Turns USB-MIDI event packets into complete messages and sends messages back.
@@ -22,6 +23,11 @@ public:
   void poll();                      ///< run the USB stack, flush sends, read pending packets
   void send(const MidiMessage &msg);
   size_t txSpace() const; ///< free bytes in the send queue (each message takes 3 extra)
+
+  /*! Stream part of a SysEx message (stage 14) as USB-MIDI packets through the send queue, so a
+   *  message of any length goes out; at most sysExPartRoom() bytes per call */
+  void sendSysExPart(const uint8_t *bytes, size_t length, uint8_t cable = 0);
+  size_t sysExPartRoom() const;
 
   // Safe to call from any task
   bool connected() const { return _connected; }
@@ -52,7 +58,11 @@ private:
   uint32_t _packetMicros = 0; // arrival time of the packet being parsed
   bool _sysexOverflow = false;
 
-  // Send queue of records: [cable] [length low] [length high] [bytes...]
+  // Send queue of records: [cable] [length low] [length high] [bytes...]; cable 0xFF marks
+  // ready-made USB-MIDI packets (streamed SysEx)
+  static constexpr uint8_t kPacketRecord = 0xFF;
+  static constexpr size_t kPacketRecordBytes = 48; // 16 packets per record = one USB transfer
+  Syx::UsbPacker _packer;
   uint8_t _tx[kTxQueueLength];
   size_t _txHead = 0, _txTail = 0;
   uint8_t _txMessage[kMaxSysExLength];

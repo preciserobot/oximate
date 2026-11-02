@@ -20,4 +20,5 @@ struct USBH_MIDI
   uint8_t RecvData(uint16_t *, uint8_t *) { return 1; }
   uint8_t SendData(uint8_t *p, uint8_t) { gUsbSent.push_back({p, p + 3}); return 0; }
   uint8_t SendSysEx(uint8_t *p, uint16_t n, uint8_t) { gUsbSent.push_back({p, p + n}); return 0; }
+  uint8_t SendRawData(uint16_t n, uint8_t *p) { gUsbSent.push_back({p, p + n}); return 0; }
 };

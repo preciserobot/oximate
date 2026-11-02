@@ -17,6 +17,7 @@ public:
     uint32_t txDropped = 0; ///< messages that did not fit the output queue
     uint32_t rxBytes = 0;   ///< bytes received from DIN IN
     uint32_t txBytes = 0;   ///< bytes written to DIN OUT
+    uint32_t heldDropped = 0; ///< messages dropped because the hold queue was full during a streamed SysEx
   };
 
   void begin(HardwareSerial &serial, int8_t rxPin, int8_t txPin, MidiHandler handler);
@@ -27,6 +28,12 @@ public:
   void send(const MidiMessage &msg);
   size_t txSpace() const { return _queue.space(); } ///< free bytes for non-realtime messages
 
+  /*! Stream part of a SysEx message (stage 14), up to txSpace() bytes. From its F0 until its F7
+   *  the stream belongs to the sender: other non-realtime messages wait in a small hold queue
+   *  (anything inserted would end the SysEx); realtime bytes (clock) still go first. */
+  void sendRaw(const uint8_t *bytes, size_t length);
+  bool rawOpen() const { return _rawOpen; } ///< a streamed SysEx has started but not ended
+
   const Counters &counters() const { return _counters; }
 
 private:
@@ -34,6 +41,7 @@ private:
   static constexpr size_t kFifoTarget = 4;     // bytes kept in the FIFO: bounds realtime latency to ~1.6 ms
   static constexpr size_t kQueueLength = 2048; // normal messages
   static constexpr size_t kRealtimeLength = 64;
+  static constexpr size_t kHoldLength = 512; // other output while a streamed SysEx owns the stream
 
   template <size_t N>
   struct ByteQueue
@@ -69,4 +77,8 @@ private:
 
   ByteQueue<kQueueLength> _queue;
   ByteQueue<kRealtimeLength> _realtime;
+  ByteQueue<kHoldLength> _held;
+  bool _rawOpen = false;
+
+  void releaseHeld();
 };

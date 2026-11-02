@@ -13,6 +13,10 @@ namespace InputHooks
 {
 using Interceptor = bool (*)(const MidiMessage &msg, void *ctx); ///< return true to consume
 using Observer = void (*)(const MidiMessage &msg, bool forwarded, void *ctx);
+/*! Raw SysEx bytes as they arrive (F0, data, F7), before the parsers' 1024-byte assembly limit:
+ *  the SysEx librarian (stage 14) captures dumps of any size through it. Realtime bytes inside a
+ *  SysEx are not passed on. One tap. */
+using SysExTap = void (*)(MidiSource source, const uint8_t *bytes, uint16_t length, void *ctx);
 
 constexpr int kMax = 8;
 
@@ -24,6 +28,8 @@ struct Registry
   Observer observers[kMax];
   void *observerCtx[kMax];
   int observerCount = 0;
+  SysExTap sysexTap = nullptr;
+  void *sysexCtx = nullptr;
 };
 
 inline Registry &registry()
@@ -64,5 +70,18 @@ inline void observe(const MidiMessage &msg, bool forwarded)
 {
   Registry &r = registry();
   for (int i = 0; i < r.observerCount; i++) r.observers[i](msg, forwarded, r.observerCtx[i]);
+}
+
+inline void setSysExTap(SysExTap tap, void *ctx)
+{
+  registry().sysexCtx = ctx;
+  registry().sysexTap = tap;
+}
+
+/*! Called by the DIN and USB parsers with SysEx bytes as they arrive */
+inline void sysex(MidiSource source, const uint8_t *bytes, uint16_t length)
+{
+  Registry &r = registry();
+  if (r.sysexTap) r.sysexTap(source, bytes, length, r.sysexCtx);
 }
 } // namespace InputHooks
