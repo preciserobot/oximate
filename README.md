@@ -205,6 +205,7 @@ piece is built by the first stage that needs it.
 | Input observers | 7, 9 | pages and modules that **watch** input after routing (trainer, analyser) |
 | LED claims | all | a mode claims a range of LEDs (`claim(owner, first, count)`, `setPixel`, `clear`, `release`). Unclaimed LEDs show input activity. Stage 16 warnings overlay everything |
 | `ClockEngine` | 8 | the only source of outgoing clock and transport |
+| `Cues` (`src/cue_queue.h`) | 10 | haptic/click cue list and a queue any task can post to; stage 10's player consumes it (stage 22 posts phrase cues) |
 | `SamSynth` | 6 | the only code that talks to the SAM2695; stages claim parts |
 | `StepSequencer` | 4 | pattern/step core shared by the Push 2 sequencer and the drum machine |
 | `music_theory` | 7 / 21 | note names, interval/chord/scale tables, pitch-class sets, exact chord matching with inversions. **Created by stage 7**; stage 21 extends the chord table (appending after `Add9`) and adds the scoring matcher both use |

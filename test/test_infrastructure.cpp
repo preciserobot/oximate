@@ -34,3 +34,18 @@ TEST(testInputHooks)
   CHECK(gObserved == 11);
   InputHooks::registry() = InputHooks::Registry();
 }
+
+#include "cue_queue.h"
+
+TEST(testCueQueue)
+{
+  static Cues::Queue queue;
+  CHECK(queue.post(Cue::Beat, 1000));
+  CHECK(queue.post(Cue::Kick, 0, 100));
+  Cues::Item item;
+  CHECK(queue.take(item) && item.cue == Cue::Beat && item.dueMicros == 1000);
+  CHECK(queue.take(item) && item.cue == Cue::Kick && item.velocity == 100);
+  CHECK(!queue.take(item));
+  for (int i = 0; i < Cues::Queue::kLength + 3; i++) queue.post(Cue::TouchTick);
+  CHECK(queue.dropped() == 4); // one slot always stays free
+}
