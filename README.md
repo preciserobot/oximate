@@ -748,6 +748,9 @@ captures routed input from a MIDI-task observer into PSRAM at 96 PPQN.
 Standard MIDI Files go to the SD card from a low-priority task, at most 4 KB
 per hold of the shared SPI bus. Without a card everything except save and load
 works. Needs a microSD card in the Core2.
+**Measured 2026-11-02** (8 GB-class SDHC card, FAT32, Diag system view line "SD"): a 4 KB write
+plus flush holds the bus for ~12.5 ms and a 4 KB read for ~2.6 ms. So write in ~1 KB chunks
+(~3 ms) while MIDI runs, and use 4 KB chunks only when the transport is stopped.
 **Full plan:** [docs/stages/stage-13.md](docs/stages/stage-13.md)
 
 ### Stage 14: SysEx librarian
@@ -1020,6 +1023,7 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/midi_outputs.*`| the single send path (DIN, USB), with counters |
 | `src/note_tracker.*`| held and sustained notes per output, as sent |
 | `src/spi_bus.*`     | lock for the SPI bus shared by display, USB host and SD |
+| `src/sd_check.*`    | SD card check at boot (type, size, 4 KB write/read time on the shared bus) |
 | `src/sync.h`        | small critical sections between the two cores |
 | `src/midi_message.h`| `MidiMessage`, the common type for complete messages |
 | `src/usb_midi.*`    | USB host: USB-MIDI packets ⇄ messages, including SysEx assembly |

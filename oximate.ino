@@ -52,6 +52,7 @@
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
+#include "src/sd_check.h"
 #include "src/speaker_synth.h"
 #include "src/spi_bus.h"
 #include "src/synth_page.h"
@@ -163,6 +164,16 @@ void setup()
     Serial.println("USB host init failed");
     Ui::splash("USB host failed: check DIP switches");
     while (true) delay(1000);
+  }
+
+  Ui::splash("SD card");
+  SdInfo sd = SdCheck::run();
+  if (sd.present) {
+    Serial.printf("SD %s, %llu MB, %llu MB used; 4 KB write %lu us, read %lu us, %s\n", sd.type,
+                  sd.totalBytes >> 20, sd.usedBytes >> 20, (unsigned long)sd.writeMicros,
+                  (unsigned long)sd.readMicros, sd.readBackOk ? "read back OK" : "READ BACK FAILED");
+  } else {
+    Serial.println("SD: no card (or not FAT16/FAT32)");
   }
 
   // Keep the start-up screen up for at least 3 s, then the pages take over

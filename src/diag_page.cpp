@@ -1,6 +1,7 @@
 #include "diag_page.h"
 
 #include "din_midi.h"
+#include "sd_check.h"
 #include "midi_outputs.h"
 #include "usb_midi.h"
 
@@ -196,6 +197,15 @@ void DiagPage::drawSystem()
   snprintf(text, sizeof(text), " Bus held %lu ms/2s (%s)", (unsigned long)(SpiBus::maxHoldMicros() / 1000),
            SpiBus::maxHolder());
   line(8, text);
+  const SdInfo &sd = SdCheck::result();
+  if (sd.present) {
+    snprintf(text, sizeof(text), " SD %s %lu MB free, 4K w%lu r%lu ms%s", sd.type,
+             (unsigned long)((sd.totalBytes - sd.usedBytes) >> 20), (unsigned long)(sd.writeMicros / 1000),
+             (unsigned long)(sd.readMicros / 1000), sd.readBackOk ? "" : " ERR");
+  } else {
+    strcpy(text, " SD  no card (FAT32 needed)");
+  }
+  line(9, text);
   snprintf(text, sizeof(text), " UI loop   avg %lu us  max %lu us", (unsigned long)_loopAvgShown,
            (unsigned long)_loopMaxShown);
   line(7, text);
