@@ -104,7 +104,8 @@ the USB Host Module.
   name with `>` on the left of the header shows where you are: Monitor →
   Router → Synth → Drums → Gen → Clock → Analyse → Phrase → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
-  source, tempo and transport, and on the right the battery level (green
+  source, tempo and transport, a cyan `SPK` while the built-in speaker is the
+  output, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
   The USB device's VID:PID is on the Diag page's system view.
 * **Touch buttons A/B/C** (the three circles below the screen) belong to the
@@ -121,17 +122,32 @@ the USB Host Module.
 |------|---|---|---|
 | Monitor | Clear the log | Pause / resume | Show / hide clock messages |
 | Router | All channels on | LED brightness | Default settings |
-| Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row) | + selected value (hold: repeat) |
+| Synth | − selected value (hold: repeat) | Browse (instrument cell) / Test (layer row); **hold: output chip ↔ built-in speaker** | + selected value (hold: repeat) |
 | Drums | Play / Stop (following an external clock: Arm / Disarm) | Mute lane (hold: solo); Sound view: audition | Next view (Grid → Sound → Pattern) |
 | Gen (list) | Previous slot (hold: realign all slots on the next bar) | Mute (Turing: lock / unlock; hold: reseed; Euclid hold: new rotation) | Next slot |
 | Gen (edit) | − selected setting (hold: repeat) | as in the list | + selected setting (hold: repeat) |
-| Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues (hold: **cues on / off**, any view) |
+| Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo, from the 4th tap; the big BPM digits are a tap target too (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues (hold: **cues on / off**, any view) |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Phrase | Reset (the current bar becomes bar 1) | Bar 1: tap on a downbeat, rounded to the nearest bar (hold: restart the phrase, keep the section count) | Normal / big view |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
 | Chord | Clear history and held notes (hold: freeze / unfreeze) | Full / simple (big chord) view | Sharps / flats |
 | Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
+
+### What runs when
+
+Pages are only views: swiping changes what you see and what A/B/C do. All MIDI
+work runs in the background, whichever page is visible.
+
+* **Always running:** merging and routing, the clock engine, panic and
+  automatic release, synth chip control, chord detection, clock analysis and
+  phrase counting. The last three only measure.
+* **Plays only when started:** the drum machine (A Play on Drums, while the
+  clock runs), Gen slots (once unmuted, while the clock runs), the ear trainer
+  (only while its page is open), effects (chains you switch on), and the
+  looper (when recording or playing).
+* Drums, Gen and live input all play together in sync. LEDs and haptic cues
+  belong to the visible page (cues are off by default).
 
 ## Architecture
 
@@ -485,10 +501,15 @@ external gear on DIN OUT.
 * Shows a warning in Separate wiring that settings reach DIN gear.
 * Message encodings come from the datasheet; there are golden-byte tests in
   `make test`.
-* **Output: chip or built-in speaker** (Synth page, bottom row). In speaker
+* **Output: chip or built-in speaker**: one global setting on the Synth page
+  (bottom-row chip, or hold B on the Synth page). The header shows `SPK` while
+  the speaker is the output. In speaker
   mode the chip is silenced and the Core2 plays the layer channels (All
   mode: every channel, channel 10 as drums) and the test and preview sounds
-  through its own speaker, so previews send nothing to DIN. It has 8 voices,
+  through its own speaker, so previews send nothing to DIN. The drum machine,
+  the ear trainer and generated notes (Gen slots, later the looper) also play
+  on the speaker. Generated notes reach it through `src/local_sound.h`, a
+  `MidiOutputs` listener. It has 8 voices,
   one soft wave for every instrument, and simple blips for drums; the volume
   follows the master volume.
 * **Not built yet:** per-layer pan and chorus send, MT-32 instrument names, following program changes from
@@ -572,7 +593,10 @@ Internal MIDI clock, and the **timing architecture every later stage uses**.
   task.
 * Tap tempo is computed on the UI side and written to the tempo setting, so
   nothing writes settings back across cores. A tap doesn't realign the beat
-  phase yet.
+  phase yet. Since 2026-11-02: tempo only from the 4th tap (B shows "Tap 2/4"),
+  average of the last 4 intervals, a gap of ~2 intervals counts as a missed
+  tap and is filled in, other taps more than 30% off are ignored, a pause over
+  3 s starts again; tapping the big BPM digits counts as a tap.
 * Internal clock is sent continuously, also while stopped, so followers
   always know the tempo. Step, beat and bar events only run while playing.
 * Tempo is changed with ±1 / ±0.1 chips; dragging the digits isn't built.
@@ -1070,6 +1094,7 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/phrase_tracker.*` | phrase counting in the MIDI task (bars, phrases, sections, realign, Song Position, cues, boundary hooks) |
 | `src/phrase_page.*` | the Phrase page |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
+| `src/local_sound.h` | copies generated notes (Gen, looper) to the speaker in speaker mode |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, cue settings, count-in, LED beat display, IMU tap) |
 | `src/haptics.*`     | stage 10 cue player: vibration patterns, priorities, scheduled beats, speaker click; clock listener and kick observer |

@@ -47,6 +47,7 @@ are built on top; the rest can be checked along the way.
 * [x] **MUST** Start/Stop sends clock to the M8 over USB (the M8 follows the tempo and starts/stops)
 * [x] **MUST** Outputs view: switching DIN clock on makes the Elektron follow over DIN
 * [x] The tempo chips (±1, ±0.1) and tap tempo (B) change the tempo
+  > Update 2026-11-02: tap tempo now needs 4 taps (B shows "Tap 2/4"), fills in one missed tap, and the big BPM digits are a tap target — please re-check
 * [x] The LEDs show beat and bar while the Clock page is open
 * [x] **MUST** Source DIN with the Elektron sending clock: tempo shown, rightmost LED turns blue (locked)
 * [x] **MUST** Stopping or unplugging the Elektron's clock: the display shows LOST and OxiMate stops

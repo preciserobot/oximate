@@ -49,3 +49,22 @@ TEST(testCueQueue)
   for (int i = 0; i < Cues::Queue::kLength + 3; i++) queue.post(Cue::TouchTick);
   CHECK(queue.dropped() == 4); // one slot always stays free
 }
+
+#include "local_sound.h"
+
+TEST(testLocalSoundTap)
+{
+  OutputRig rig;
+  static LocalSoundTap tap;
+  tap.begin(rig.outputs);
+  uint8_t on[3] = {0x92, 60, 100}, off[3] = {0x82, 60, 0}, cc[3] = {0xB2, 74, 1};
+  rig.outputs.send(MidiOutput::Din, {MidiSource::Din, 0, on, 3}, Origin::internal(12)); // Gen
+  rig.outputs.send(MidiOutput::Din, {MidiSource::Din, 0, cc, 3}, Origin::internal(12)); // not a note
+  rig.outputs.send(MidiOutput::Din, {MidiSource::Din, 0, on, 3}, Origin::internal(5));  // drums: own path
+  rig.outputs.send(MidiOutput::Din, {MidiSource::Din, 0, on, 3}, Origin::fromInput(MidiSource::Usb)); // input
+  rig.outputs.send(MidiOutput::Din, {MidiSource::Din, 0, off, 3}, Origin::internal(12));
+  LocalSoundTap::Note note;
+  CHECK(tap.take(note) && note.channel == 3 && note.note == 60 && note.velocity == 100);
+  CHECK(tap.take(note) && note.velocity == 0);
+  CHECK(!tap.take(note));
+}

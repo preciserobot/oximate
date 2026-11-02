@@ -42,6 +42,7 @@
 #include "src/gen_page.h"
 #include "src/input_observers.h"
 #include "src/leds.h"
+#include "src/local_sound.h"
 #include "src/midi_outputs.h"
 #include "src/midi_task.h"
 #include "src/monitor.h"
@@ -78,6 +79,7 @@ Ui ui;
 Monitor monitor;
 RouterPage routerPage(router, leds, clockEngine);
 SpeakerSynth speakerSynth;
+LocalSoundTap localSound; // generated notes (Gen, looper) for the built-in speaker
 SynthPage synthPage(samSynth, speakerSynth);
 DrumPage drumPage(drumMachine, clockEngine, leds);
 GenPage genPage(genEngine, leds);
@@ -134,6 +136,7 @@ void setup()
   phraseTracker.begin(clockEngine);
   router.begin(outputs, clockEngine);
   samSynth.begin(outputs);
+  localSound.begin(outputs);
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
   genEngine.begin(outputs, clockEngine);   // clock listener
   ClockSource oldClock;
@@ -361,6 +364,15 @@ void loop()
   while (drumMachine.takeHit(drumNote, drumVelocity)) {
     if (samSynth.config().speaker) speakerSynth.noteOn(drumNote, drumVelocity, true);
   }
+  // Generated notes (Gen slots, ...) also play on the built-in speaker in speaker mode
+  LocalSoundTap::Note generated;
+  while (localSound.take(generated)) {
+    if (!samSynth.config().speaker) continue;
+    bool drums = generated.channel == 10;
+    if (generated.velocity) speakerSynth.noteOn(generated.note, generated.velocity, drums);
+    else if (!drums) speakerSynth.noteOff(generated.note);
+  }
+  ui.setStatusTag(samSynth.config().speaker ? "SPK" : nullptr);
   speakerSynth.update();
   diagPage.eventsDropped(MidiTask::events().dropped());
   uint32_t loopEnd = micros();

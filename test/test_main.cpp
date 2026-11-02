@@ -441,15 +441,32 @@ static void testClockFollow()
 
 static void testTapTempo()
 {
+  // No tempo before the 4th tap
   TapTempo tap;
   CHECK(tap.tap(0) == 0);
-  CHECK(fabsf(tap.tap(500000) - 120) < 0.01f);
-  CHECK(fabsf(tap.tap(1000000) - 120) < 0.01f);
-  CHECK(tap.tap(1100000) == 0); // stray double tap ignored
+  CHECK(tap.tap(500000) == 0);
+  CHECK(tap.tap(1000000) == 0 && tap.taps() == 3);
   CHECK(fabsf(tap.tap(1500000) - 120) < 0.01f);
-  CHECK(fabsf(tap.tap(2100000) - 60e6f / 525000) < 0.01f); // average of 500, 500, 500, 600 ms
-  CHECK(tap.tap(5000000) == 0);                             // gap over 2 s starts again
-  CHECK(fabsf(tap.tap(5250000) - 240) < 0.01f);
+  CHECK(tap.tap(1600000) == 0);                     // stray double tap ignored
+  CHECK(fabsf(tap.tap(2000000) - 120) < 0.01f);
+  CHECK(fabsf(tap.tap(2600000) - 60e6f / 525000) < 0.01f); // average of 500, 500, 500, 600 ms
+
+  // A missed tap (a gap of two intervals) is filled in instead of breaking the run
+  TapTempo missed;
+  missed.tap(0);
+  missed.tap(500000);
+  missed.tap(1000000);                              // 3 taps, no tempo yet
+  CHECK(fabsf(missed.tap(2000000) - 120) < 0.01f);  // 1500 didn't register: counts as 2 intervals
+  CHECK(missed.taps() == 5);
+  CHECK(fabsf(missed.tap(2500000) - 120) < 0.01f);
+
+  // A pause over 3 s starts a new run; at 60 BPM a missed tap (2 s) does not
+  TapTempo slow;
+  slow.tap(0);
+  slow.tap(1000000);
+  CHECK(fabsf(slow.tap(3000000) - 60) < 0.01f && slow.taps() == 4); // 0, 1, (2 filled in), 3 = 4 taps
+  CHECK(fabsf(slow.tap(4000000) - 60) < 0.01f);
+  CHECK(slow.tap(8000000) == 0 && slow.taps() == 1);  // over 3 s later: a new run
 }
 
 static void testRouterMigration()

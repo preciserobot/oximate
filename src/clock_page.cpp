@@ -50,7 +50,15 @@ static float roundBpm(float bpm)
 void ClockPage::buttonLabels(const char *labels[3]) const
 {
   labels[0] = _clock.snapshot().running || _countInLeft ? "Stop" : "Start";
-  labels[1] = _view == View::Cues ? "Test" : "Tap";
+  if (_view == View::Cues) {
+    labels[1] = "Test";
+  } else if (_tapping && _tap.taps() < TapTempo::kMinTaps) {
+    static char progress[10]; // "Tap 2/4" while the first taps of a run come in
+    snprintf(progress, sizeof(progress), "Tap %d/%d", _tap.taps(), TapTempo::kMinTaps);
+    labels[1] = progress;
+  } else {
+    labels[1] = "Tap";
+  }
   labels[2] = _view == View::Main ? "Outputs" : (_view == View::Outputs ? "Cues" : "Main");
 }
 
@@ -105,6 +113,8 @@ void ClockPage::toggleCues()
 void ClockPage::tapNow(uint32_t micros)
 {
   float bpm = _tap.tap(micros);
+  _tapping = true;
+  markFooterDirty(); // "Tap n/4" progress
   ClockConfig &config = _clock.config();
   if (bpm > 0 && config.mode == ClockMode::Internal) {
     config.bpm = roundBpm(bpm);
@@ -126,6 +136,10 @@ void ClockPage::onTouch(int x, int y)
 
   if (_view == View::Cues) {
     cuesTouch(x, y);
+    return;
+  }
+  if (_view == View::Main && y >= kDigitsY && y < kDigitsY + 50) {
+    tapNow(micros()); // the big tempo digits are a large tap target (B is small)
     return;
   }
   if (_view == View::Outputs) {
@@ -308,6 +322,10 @@ void ClockPage::tick()
 {
   ClockEngine::Snapshot snap = _clock.snapshot();
   renderLeds(snap);
+  if (_tapping && !_tap.active(micros())) {
+    _tapping = false;
+    markFooterDirty();
+  }
   // The Start/Stop label follows the real transport state: commands take effect in the MIDI
   // task a moment after the button press, and a followed clock starts and stops on its own
   if (snap.running != _labelRunning) {

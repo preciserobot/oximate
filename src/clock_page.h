@@ -44,6 +44,7 @@ private:
   Leds &_leds;
   Haptics &_haptics;
   TapTempo _tap;
+  bool _tapping = false; ///< a tap run is going on (B shows "Tap n/4")
   /// C cycles Main -> Outputs -> Cues (stage 10 haptic settings)
   enum class View : uint8_t
   {

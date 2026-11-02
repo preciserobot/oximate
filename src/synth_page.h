@@ -15,6 +15,7 @@ public:
   const char *title() const override { return "Synth"; }
   void buttonLabels(const char *labels[3]) const override;
   void onButton(int index) override;
+  void onButtonHold(int index) override;
   void onTouch(int x, int y) override;
   void enter() override;
   void tick() override;

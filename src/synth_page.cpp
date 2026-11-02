@@ -124,6 +124,17 @@ void SynthPage::onButton(int index)
   }
 }
 
+void SynthPage::onButtonHold(int index)
+{
+  if (index != 1 || _browsing) return;
+  // Hold B: switch the output between the synth chip and the built-in speaker
+  SynthConfig &c = _synth.config();
+  c.speaker = !c.speaker;
+  _speaker.allOff();
+  changed();
+  if (ui()) ui()->flash(c.speaker ? "Out: Speaker" : "Out: Chip", TFT_DARKCYAN, 1200);
+}
+
 void SynthPage::tick()
 {
   // Holding A or C repeats - / +

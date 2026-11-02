@@ -111,6 +111,15 @@ public:
     _serviceHook = service;
     _touchHook = touched;
   }
+  /*! A short marker in the header (e.g. "SPK" while the built-in speaker is the output);
+   *  nullptr hides it. Cheap to call every loop: redraws only on change. */
+  void setStatusTag(const char *tag)
+  {
+    if (tag != _statusTag) {
+      _statusTag = tag;
+      _headerDirty = true;
+    }
+  }
   /*! Show a short message in the header's right side for `millis` (e.g. "PANIC") */
   void flash(const char *text, uint16_t color, uint32_t millis);
 
@@ -140,6 +149,7 @@ private:
   bool _charging = false;
   uint32_t _batteryReadAt = 0;
 
+  const char *_statusTag = nullptr;
   char _flashText[20] = "";
   uint16_t _flashColor = TFT_WHITE;
   uint32_t _flashUntil = 0;

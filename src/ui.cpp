@@ -232,6 +232,13 @@ void Ui::drawHeader()
   bar.setCursor(0, (kHeaderHeight - kCharHeight) / 2);
   bar.print(text);
   drawBattery();
+  if (_statusTag) { // between the clock text (ends at column 30) and the battery
+    bar.setFont(&fonts::Font0);
+    bar.setTextColor(TFT_CYAN, kBarColor);
+    bar.setCursor(31 * kCharWidth - 2, 6);
+    bar.print(_statusTag);
+    bar.setFont(&fonts::AsciiFont8x16);
+  }
   if (_flashUntil) {
     const int x = 16 * kCharWidth; // where the clock text starts
     bar.fillRect(x, 0, bar.width() - x, kHeaderHeight, _flashColor);
