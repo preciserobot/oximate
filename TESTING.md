@@ -182,6 +182,25 @@ background; A resets them.
 - [ ] Unplugging the USB keyboard while holding notes clears them; a panic clears them
 - [ ] Settings survive a power cycle
 
+## 13. Phrase tracker (stage 22)
+
+The Phrase page sits after Analyse. Defaults: 16-bar phrases, 4 phrases per
+section, 1-bar warning.
+
+- [ ] Internal clock: Start on the Clock page, then the Phrase page counts 1 → 16 in time; bar 1 of each phrase flashes the LEDs white
+- [ ] Bar 16 (the warning bar) turns the counter and the LEDs orange
+- [ ] "phrase n / 4" steps on every 16 bars and wraps after 4
+- [ ] Length chip (4/8/16/32) changes the count at once without jumping strangely
+- [ ] Following the Elektron (Clock source DIN) with its Start: counts from its bar 1
+- [ ] Plugging into an Elektron that is already playing (no Start seen): the count runs with a red `?`; tapping B on a downbeat makes that bar bar 1 and clears the `?`
+  > Is the "nearest bar" rounding forgiving enough for a slightly late or early tap?
+- [ ] Hold B mid-section restarts the phrase but keeps "phrase n / 4"
+- [ ] Stop on the master freezes the count; Continue carries on; Start goes back to bar 1
+- [ ] Song Position from the master (if it sends it) realigns; with "SPP off" it doesn't
+- [ ] C: big view is readable from a distance
+- [ ] Settings survive a power cycle (changed while stopped)
+  > Which phrase lengths and warning time feel right in practice?
+
 ## Other notes
 
 >

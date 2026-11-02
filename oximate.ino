@@ -44,6 +44,8 @@
 #include "src/monitor.h"
 #include "src/note_tracker.h"
 #include "src/panic.h"
+#include "src/phrase_page.h"
+#include "src/phrase_tracker.h"
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
@@ -80,6 +82,8 @@ ChordDetector chordDetector; // stage 21: names them (UI side); stableName() is 
 ChordPage chordPage(chordInput, chordDetector, clockEngine, leds);
 ClockAnalyser clockAnalyser; // stage 9: fed by an input observer in the MIDI task
 AnalyserPage analyserPage(clockAnalyser, leds);
+PhraseTracker phraseTracker; // stage 22: counts bars in the MIDI task (ClockEngine listener)
+PhrasePage phrasePage(phraseTracker, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
@@ -100,6 +104,7 @@ void midiTaskLoop(uint32_t nowMillis)
   panic.run(nowMillis);
   samSynth.run(nowMillis);
   drumMachine.run(nowMillis);
+  phraseTracker.run();
   chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
 }
@@ -118,6 +123,7 @@ void setup()
   dinMidi.begin(Serial2, M5.getPin(m5::pin_name_t::port_c_rxd), M5.getPin(m5::pin_name_t::port_c_txd), onMidi);
   outputs.begin(dinMidi, usbMidi, noteTracker);
   clockEngine.begin(outputs);
+  phraseTracker.begin(clockEngine);
   router.begin(outputs, clockEngine);
   samSynth.begin(outputs);
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
@@ -154,6 +160,7 @@ void setup()
   ui.addPage(drumPage);
   ui.addPage(clockPage);
   ui.addPage(analyserPage);
+  ui.addPage(phrasePage);
   earPage.begin();
   ui.addPage(earPage);
   chordPage.begin();
@@ -288,6 +295,7 @@ void loop()
   router.poll();
   clockEngine.poll();
   samSynth.poll();
+  phraseTracker.poll();
   earPage.poll();
   chordDetector.update(chordInput.snapshot(), millis()); // also off-page, so the history keeps up
   chordPage.poll();
