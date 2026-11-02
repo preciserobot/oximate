@@ -1,6 +1,6 @@
 # Stage 13: Recorder / looper
 
-> **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
+> **Status: looper implemented 2026-11-02 (the free recorder is still a plan).** Written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 
 Records MIDI as it passes through OxiMate and plays it back. There are two

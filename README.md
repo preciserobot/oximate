@@ -30,7 +30,7 @@ synth.
 | 10 | [Haptic metronome](#stage-10-haptic-metronome) | ✅ | needs hardware test |
 | 11 | [MIDI effects](#stage-11-midi-effects) | — | planned (full plan) |
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | ✅ | needs hardware test |
-| 13 | [Recorder / looper](#stage-13-recorder--looper) | — | planned (full plan) |
+| 13 | [Recorder / looper](#stage-13-recorder--looper) | ✅ | looper done (recorder to do); needs hardware test |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | planned (full plan) |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | planned (full plan) |
 | 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Drums → Gen → Clock → Analyse → Phrase → Ear → Chord → Diag → Monitor.
+  Router → Synth → Drums → Gen → Clock → Analyse → Phrase → Loop → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -127,6 +127,7 @@ the USB Host Module.
 | Gen (edit) | − selected setting (hold: repeat) | as in the list | + selected setting (hold: repeat) |
 | Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues (hold: **cues on / off**, any view) |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
+| Loop | Rec: arm (empty), disarm, cancel the first pass (hold: undo the last pass) | Playback on / off | Overdub on / off |
 | Phrase | Reset (the current bar becomes bar 1) | Bar 1: tap on a downbeat, rounded to the nearest bar (hold: restart the phrase, keep the section count) | Normal / big view |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
@@ -752,6 +753,26 @@ works. Needs a microSD card in the Core2.
 **Measured 2026-11-02** (8 GB-class SDHC card, FAT32, Diag system view line "SD"): a 4 KB write
 plus flush holds the bus for ~12.5 ms and a 4 KB read for ~2.6 ms. So write in ~1 KB chunks
 (~3 ms) while MIDI runs, and use 4 KB chunks only when the transport is stopped.
+**Implemented (2026-11-02): the looper.** Differences from the plan:
+
+* **The free recorder isn't built yet:** only the clock-synced looper is.
+* **Recording:** routed input only (the InputHooks observer ignores messages that weren't
+  forwarded). Program changes aren't recorded. Input filter: USB/DIN and one channel or all.
+  "Notes up to a sixteenth early count as the downbeat" isn't built.
+* **Passes:** a pass collects in a pending list and joins the loop at each loop end, so a
+  pass is heard from the next cycle on. Notes held over the end are cut there and, while
+  overdubbing, restarted at the start. Up to 16 passes; undo removes the last one.
+* **Start:** on the next bar line, or (chip "Phrase") the next phrase of stage 22.
+  "Mute while overdubbing" isn't built.
+* **Files:** Save writes `/oximate/loops/loopNNN.mid` (type 1 with one track per channel when
+  the loop uses several channels, else type 0; 96 PPQN, tempo and time signature). Load lists
+  that folder; a loaded loop keeps its own length and joins at the next bar. The clock's
+  tempo is not changed by loading.
+* **SD access:** a low-priority task on core 1 (`src/sd_store.*`) writes 1 KB chunks while
+  the clock runs and 4 KB when stopped, each under the SPI bus lock. Closing a file (the
+  FAT update) is the longest hold.
+* **LEDs:** only while the Loop page is open (not "red on every page while recording").
+
 **Full plan:** [docs/stages/stage-13.md](docs/stages/stage-13.md)
 
 ### Stage 14: SysEx librarian
@@ -1052,6 +1073,11 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/chord_page.*`  | the Chord page |
 | `src/phrase_tracker.*` | phrase counting in the MIDI task (bars, phrases, sections, realign, Song Position, cues, boundary hooks) |
 | `src/phrase_page.*` | the Phrase page |
+| `src/loop_buffer.*` | looper event storage: passes, merge per cycle, quantise, undo |
+| `src/looper.*`      | clock-synced looper in the MIDI task (capture observer, playback, note safety) |
+| `src/looper_page.*` | the Loop page and its file list |
+| `src/smf.*`         | Standard MIDI File writer and reader (type 0/1, rescaled to 96 PPQN) |
+| `src/sd_store.*`    | SD task on core 1: chunked file reads/writes under the bus lock, folder listing |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, cue settings, count-in, LED beat display, IMU tap) |
