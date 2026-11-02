@@ -39,7 +39,7 @@ synth.
 | 19 | [Extra controls](#stage-19-extra-controls) | — | planned (full plan) |
 | 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | idea |
 | 21 | [Chord detector](#stage-21-chord-detector) | ✅ | needs hardware test |
-| 22 | [Phrase tracker](#stage-22-phrase-tracker) | — | planned (full plan) |
+| 22 | [Phrase tracker](#stage-22-phrase-tracker) | ✅ | needs hardware test |
 
 Details for each stage are in [Stages](#stages).
 
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → Synth → Drums → Gen → Clock → Analyse → Ear → Chord → Diag → Monitor.
+  Router → Synth → Drums → Gen → Clock → Analyse → Phrase → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, and on the right the battery level (green
   above 50%, yellow from 20%, red below 20%, cyan with `+` while charging).
@@ -127,6 +127,7 @@ the USB Host Module.
 | Gen (edit) | − selected setting (hold: repeat) | as in the list | + selected setting (hold: repeat) |
 | Clock | Start / Stop (hold while stopped: Continue) | Tap tempo | Outputs view |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
+| Phrase | Reset (the current bar becomes bar 1) | Bar 1: tap on a downbeat, rounded to the nearest bar (hold: restart the phrase, keep the section count) | Normal / big view |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
 | Chord | Clear history and held notes (hold: freeze / unfreeze) | Full / simple (big chord) view | Sharps / flats |
@@ -927,6 +928,35 @@ Song Position; phrase lengths needed; vibration cues and warning lead time;
 named sections; program changes at boundaries.
 
 **Plan (2026-11-01):** Counts bars from the clock engine (bar in phrase, phrase in section), with a "Bar 1" resync button, Song Position realign, and `?` while the phrase position is unknown. Big counter, progress bar and countdown; LEDs fill and warn before the phrase end; vibration cues through stage 10. Defaults assumed until answered: 16 bars, 4 phrases, 1-bar warning.
+**Implemented (2026-11-02)** with the plan's assumed defaults (16-bar phrases,
+4 phrases per section, 1-bar warning, LEDs on the page, Song Position
+realigns, no program changes):
+
+* `PhraseTracker` counts in the MIDI task from the clock engine's new
+  `RawTick` event (every tick, also while stopped), Start, Stop, Continue and
+  Locate. A master that was already playing is counted from its ticks and
+  shown with a red `?` until you tap **Bar 1**. Internal clock while stopped
+  doesn't count, and a master's Stop freezes the position.
+* **Bar 1** (B) is rounded to the nearest bar line in the MIDI task; hold B
+  restarts the phrase but keeps the section count. **A** makes the current
+  bar bar 1 straight away.
+* Phrase page: big counter (orange in the warning bars), `/16`, a segment per
+  bar (warning bars orange), bars left, phrase in section, a hint while not
+  synced; chips for length, section, warning, Song Position and LEDs; C
+  switches to a big view (counter and bar only).
+* LEDs (while the page is open): segments fill across the phrase, blue,
+  orange in the warning bars, white flash on bar 1, blinking while not
+  synced.
+* Cues: `Cue::PhraseEnding` and `Cue::PhraseStart` are posted to the shared
+  cue queue one bar ahead, with the downbeat's time as `dueMicros` (stage 10
+  subtracts the motor's spin-up), only while synced.
+* Hooks for stages 13/15: `PhraseTracker::addBoundaryListener()` (called in
+  the MIDI task on every phrase start) and `PhraseSnapshot::nextPhraseTick`.
+* Settings saved in NVS (`phrase`, v1), only while stopped.
+* **Not built yet:** named sections, the opt-in program change at phrase
+  boundaries, "LEDs always", and the phrase counter in the header. A clears
+  immediately instead of "at the next Start".
+
 **Full plan:** [docs/stages/stage-22.md](docs/stages/stage-22.md)
 
 ## Build and upload
@@ -994,6 +1024,8 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/chord_input.*` | stage 21: notes held at the inputs (input observer in the MIDI task) |
 | `src/chord_detector.*` | stage 21: settle, name, alternatives, history, key estimate (UI side) |
 | `src/chord_page.*`  | the Chord page |
+| `src/phrase_tracker.*` | phrase counting in the MIDI task (bars, phrases, sections, realign, Song Position, cues, boundary hooks) |
+| `src/phrase_page.*` | the Phrase page |
 | `src/speaker_synth.*` | 8-voice synth on the Core2's built-in speaker |
 | `src/clock_engine.*` | internal/followed clock, transport, swing, output ratios, scheduler |
 | `src/clock_page.*`  | the Clock page (tempo, source, swing, outputs, LED beat display, IMU tap) |

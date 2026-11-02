@@ -54,6 +54,7 @@ struct ClockEvent
     Stop,
     Continue,
     Locate,
+    RawTick, ///< every clock tick, running or not (stage 22: counting a master that was already playing)
   };
   Type type;
   uint32_t tick;   ///< 24 PPQN ticks since start (or the located position)

@@ -238,6 +238,7 @@ uint32_t ClockEngine::swingDelayTicksX1000(uint32_t step) const
 
 void ClockEngine::tick(uint64_t timeUs)
 {
+  emit(ClockEvent::RawTick, timeUs); // also while stopped; Tick below only while running
   double period = periodUs();
   for (int o = 0; o < (int)ClockOutput::Count; o++) {
     const ClockOutputConfig &output = _active.outputs[o];

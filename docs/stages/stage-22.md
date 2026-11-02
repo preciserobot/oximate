@@ -1,6 +1,6 @@
 # Stage 22: Phrase tracker
 
-> **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
+> **Status: implemented 2026-11-02** (see the README's stage 22 section for what differs). Plan written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 >
 > The README's open questions for this stage are not answered yet. This plan uses the

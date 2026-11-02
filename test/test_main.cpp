@@ -294,7 +294,8 @@ static void testClockInternal()
   // Continuous clock while stopped: 48 ticks per second at 120 BPM, no musical events
   runFor(clock, 1000000);
   CHECK(countByte(rig.dinBytes(), 0xF8) == 47); // the 48th tick is due just after 1 s
-  CHECK(log.events.empty());
+  CHECK(log.count(ClockEvent::Step) == 0 && log.count(ClockEvent::Beat) == 0 && log.count(ClockEvent::Start) == 0);
+  CHECK(log.count(ClockEvent::RawTick) == 47); // RawTick also while stopped (stage 22)
 
   // Start: FA, then beat 1 one millisecond later; 8 steps and 2 beats per second
   clock.start();
