@@ -279,6 +279,25 @@ Internal clock running (Clock page: Start), a keyboard on USB or DIN. The SD car
   > Diag system view "bus held" during a save:
 - [ ] Without an SD card: Save/Load show "No SD card", looping still works
 
+## 17. Scenes (stage 15)
+
+Set page (after Phrase). Start with Devices: e.g. an Elektron on its auto channel (DIN),
+the Oxi, a synth. PCs are **off** per device until you switch them on.
+
+- [ ] Devices view: name, DIN/USB, channel (A/C), PC on/off, lead time (A/C) and 1/0 numbering change and survive a power cycle
+- [ ] Editor: a PC can only be set for a device with "PC on"; otherwise the header says "PC not allowed"
+- [ ] Recall with the transport stopped: PC and CCs arrive at once (check on the device or the Monitor of a second OxiMate / DAW)
+- [ ] Recall "next bar" while playing: the countdown shows beats and the LEDs fill orange; the change lands on the bar line
+- [ ] Lead time 1 on an Elektron: its pattern change lands exactly on the bar (not one pattern late)
+  > Lead time that works for your Elektron:
+- [ ] "Next phrase" with the Phrase page synced: the recall happens on the phrase start
+- [ ] Hold B: recall immediately, ignoring the scene's timing
+- [ ] Capture: tempo, router (e.g. a forced channel), synth layers, drum pattern, FX preset and Gen mutes come back on recall
+- [ ] Learn: turning a knob on a controller on a device's channel adds the CC to the scene (CC count goes up)
+- [ ] A scene with 16 CCs for several devices: no clock hiccup on the Elektron while the CCs go out
+- [ ] Panic during a pending recall: the recall is cancelled
+  > Did any program change reach a device that had "PC off"?
+
 ## Other notes
 
 >

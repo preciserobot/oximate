@@ -32,7 +32,7 @@ synth.
 | 12 | [Generative sequencers](#stage-12-generative-sequencers) | ✅ | needs hardware test |
 | 13 | [Recorder / looper](#stage-13-recorder--looper) | ✅ | looper done (recorder to do); needs hardware test |
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | — | planned (full plan) |
-| 15 | [Setlist / scenes](#stage-15-setlist--scenes) | — | planned (full plan) |
+| 15 | [Setlist / scenes](#stage-15-setlist--scenes) | ✅ | needs hardware test |
 | 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
 | 17 | [BLE MIDI](#stage-17-ble-midi) | — | planned (full plan) |
 | 18 | [Network MIDI](#stage-18-network-midi) | — | planned (full plan) |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Loop → Ear → Chord → Diag → Monitor.
+  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Set → Loop → Ear → Chord → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, a cyan `SPK` while the built-in speaker is the
   output, and on the right the battery level (green
@@ -130,6 +130,8 @@ the USB Host Module.
 | Clock | Start / Stop (hold while stopped: Continue); with a count-in set, Start counts in first | Tap tempo, from the 4th tap; the big BPM digits are a tap target too (Cues view: Test, plays every cue) | Next view: Main → Outputs → Cues (hold: **cues on / off**, any view) |
 | Analyse | Reset statistics | Next view (Stats, Histogram, Drift, Phase) | Graph input USB/DIN (hold: CSV streaming on/off) |
 | Loop | Rec: arm (empty), disarm, cancel the first pass (hold: undo the last pass) | Playback on / off | Overdub on / off |
+| Set (live) | Previous scene | Recall the armed scene with its timing (hold: recall now) | Next scene |
+| Set (editor / devices) | − selected value | Done | + selected value |
 | Phrase | Reset (the current bar becomes bar 1) | Bar 1: tap on a downbeat, rounded to the nearest bar (hold: restart the phrase, keep the section count) | Normal / big view |
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
@@ -845,6 +847,33 @@ Subharmonicon files in `subH_sysex_user/` are the first test case.
 Send program changes and CC snapshots to several devices with one touch.
 
 **Plan (2026-11-01):** Scenes of program changes and CC snapshots per device, plus optional OxiMate snapshots (tempo, routing, synth, drums, FX). Recall now, at the next bar or at the next phrase. Program changes are off per device by default (Elektron safety), with an optional lead time. Live view: A previous, B recall, C next.
+
+**Implemented (2026-11-02):** `src/scenes.*` (engine) and `src/scene_page.*` (the "Set" page,
+after Phrase).
+* **Devices** (up to 8, Devices view): name, DIN/USB, channel, **PC allowed (off by default)**,
+  PC shown as 1-128 or 0-127, lead time 0–4 beats. A scene can't hold a PC for a device that
+  doesn't allow it, and the recall strips such PCs again before sending.
+* **Scenes** (up to 32): name (from a list), timing **next bar** (default), now or next phrase,
+  per device bank MSB/LSB + PC and up to 16 CCs, and OxiMate parts: tempo, a router + synth
+  snapshot (8 shared slots), drum pattern, FX preset and which Gen slots play.
+* **Recall** runs in the MIDI task: lead-time PCs go out that many beats before the bar or
+  phrase boundary, the other PCs at the boundary, then the UI applies the OxiMate parts through
+  each module's own `changed()` (so the router's release-before-change and SamSynth's diffing
+  apply; the router's LED level and the synth's output/wiring/config channel stay as they are),
+  then CC snapshots go out 4 messages per 10 ms. Stopped transport: recalls happen at once.
+  Panic cancels a pending recall.
+* **Live view:** now / next scene, countdown in beats (and on the LEDs), the following scenes,
+  Devices / New scene / Cancel. Tap "Now" or "Next" to edit that scene.
+* **Editor:** name, timing, tempo (tap clears); PC per device (A/C, `!` = may switch patterns),
+  CC count (tap the selected CC cell again to clear); Capture (tempo, router, synth, drum
+  pattern, FX preset, Gen mutes), Clear, Learn (CCs arriving on a device's channel are stored),
+  New, Delete.
+* Saved in NVS (header key `scenes`, one key per scene `scn00`..`scn31`, snapshots `ssn0`..`ssn7`),
+  only while the transport is stopped.
+* **Differences from the plan:** no "next drum pattern end" timing and no per-device SysEx; the
+  OxiMate parts are applied by the UI a few ms after the boundary (tempo from the next clock tick);
+  scene names come from a fixed list (no text entry); the SD/JSON setlist files are a later hook
+  (`Scenes::load()/save()` are the place to add them).
 **Full plan:** [docs/stages/stage-15.md](docs/stages/stage-15.md)
 
 ### Stage 16: Panic & diagnostics
@@ -1149,6 +1178,8 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/chord_page.*`  | the Chord page |
 | `src/phrase_tracker.*` | phrase counting in the MIDI task (bars, phrases, sections, realign, Song Position, cues, boundary hooks) |
 | `src/phrase_page.*` | the Phrase page |
+| `src/scenes.*`      | setlist and scenes: devices, recall engine (MIDI task), snapshots, NVS |
+| `src/scene_page.*`  | the Set page: live view, scene editor, device setup |
 | `src/loop_buffer.*` | looper event storage: passes, merge per cycle, quantise, undo |
 | `src/looper.*`      | clock-synced looper in the MIDI task (capture observer, playback, note safety) |
 | `src/looper_page.*` | the Loop page and its file list |

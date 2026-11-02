@@ -23,6 +23,7 @@ struct Preferences
     memcpy(out, it->second.data(), it->second.size());
     return it->second.size();
   }
+  bool remove(const char *key) { return gFakeNvs.erase(ns + "/" + key) > 0; }
   size_t putBytes(const char *key, const void *data, size_t n)
   {
     const uint8_t *p = static_cast<const uint8_t *>(data);

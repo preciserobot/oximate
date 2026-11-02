@@ -1,6 +1,7 @@
 # Stage 15: Setlist / scenes
 
-> **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
+> **Status: implemented 2026-11-02** (see the README's stage 15 "Implemented" note for the
+> differences from this plan). Written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 
 One touch to move a live dawless set to its next part: a **scene** sends

@@ -53,6 +53,8 @@
 #include "src/looper.h"
 #include "src/looper_page.h"
 #include "src/phrase_page.h"
+#include "src/scene_page.h"
+#include "src/scenes.h"
 #include "src/phrase_tracker.h"
 #include "src/router.h"
 #include "src/router_page.h"
@@ -100,6 +102,8 @@ ClockAnalyser clockAnalyser; // stage 9: fed by an input observer in the MIDI ta
 AnalyserPage analyserPage(clockAnalyser, leds);
 PhraseTracker phraseTracker; // stage 22: counts bars in the MIDI task (ClockEngine listener)
 PhrasePage phrasePage(phraseTracker, leds);
+Scenes scenes;                    // stage 15: recalls run in the MIDI task; edited on the Set page
+ScenePage scenePage(scenes, leds);
 Looper looper;                                       // stage 13: runs in the MIDI task
 LooperPage looperPage(looper, clockEngine, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
@@ -126,6 +130,7 @@ void midiTaskLoop(uint32_t nowMillis)
   fxEngine.run();
   looper.run(nowMillis);
   phraseTracker.run();
+  scenes.run(nowMillis);
   chordInput.run(nowMillis, usbMidi.connected(), panic.summary().panics);
   stats.run();
 }
@@ -153,6 +158,17 @@ void setup()
   drumMachine.begin(outputs, clockEngine); // clock listener and pad interceptor
   genEngine.begin(outputs, clockEngine);   // clock listener
   looper.begin(outputs, clockEngine, &phraseTracker); // clock listener, input observer, phrase hook
+  {
+    SceneTargets targets; // what a scene can recall
+    targets.clock = &clockEngine;
+    targets.router = &router;
+    targets.synth = &samSynth;
+    targets.drums = &drumMachine;
+    targets.fx = &fxEngine;
+    targets.gen = &genEngine;
+    targets.phrase = &phraseTracker;
+    scenes.begin(outputs, targets); // clock listener, phrase hook, input observer (Learn CCs)
+  }
   ClockSource oldClock;
   if (router.migratedClock(oldClock)) { // settings from before the clock engine existed
     static const ClockMode kModes[] = {ClockMode::FollowDin, ClockMode::FollowUsb, ClockMode::FollowDin,
@@ -207,6 +223,7 @@ void setup()
   ui.addPage(clockPage);
   ui.addPage(analyserPage);
   ui.addPage(phrasePage);
+  ui.addPage(scenePage);
   ui.addPage(looperPage);
   earPage.begin();
   ui.addPage(earPage);
@@ -297,6 +314,9 @@ void handlePanic()
   // Red while the panic runs, and at least 400 ms so a quick one is still visible
   Panic::Summary state = panic.summary();
   static uint32_t panicsDone = 0;
+  static bool panicWasActive = false;
+  if (state.active && !panicWasActive) scenes.cancel(); // panic also cancels a pending scene recall
+  panicWasActive = state.active;
   if (state.panics != panicsDone) {
     if (panicsDone || state.panics == 1) Cues::post(Cue::PanicDone); // stage 10 cue
     panicsDone = state.panics;
@@ -370,6 +390,7 @@ void loop()
   samSynth.poll();
   phraseTracker.poll();
   looper.poll();
+  scenes.poll(millis());
   haptics.poll();
   checkBattery();
   earPage.poll();
