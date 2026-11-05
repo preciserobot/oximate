@@ -38,7 +38,8 @@ build-wifi: libraries/USB_Host_Shield_2.0/.patched
 		--build-path build/wifi
 
 send-wifi:
-	$(ESPTOOL) --chip esp32 --port $(PORT) --baud 921600 write-flash 0x650000 build/wifi/oximate.ino.bin
+	$(ESPTOOL) --chip esp32 --port $(PORT) --baud 460800 --before default-reset --after hard-reset \
+		write-flash -z --flash-mode keep --flash-freq keep --flash-size keep 0x650000 build/wifi/oximate.ino.bin
 
 
 # Host unit tests (no hardware needed)
