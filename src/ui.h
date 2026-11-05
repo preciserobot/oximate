@@ -28,11 +28,20 @@ constexpr int kContentHeight = kFooterTop - kContentTop;
 
 constexpr uint16_t kUsbColor = TFT_CYAN;
 constexpr uint16_t kDinColor = TFT_ORANGE;
+constexpr uint16_t kBleColor = TFT_MAGENTA;
+constexpr uint16_t kNetColor = TFT_GREENYELLOW;
 constexpr uint16_t kBarColor = TFT_NAVY;
 constexpr uint16_t kOnColor = TFT_DARKGREEN;
 constexpr uint16_t kOffColor = 0x2945; // dark grey
 constexpr uint16_t kOffTextColor = TFT_LIGHTGREY;
 } // namespace Layout
+
+/*! Monitor and page colour of an input: USB cyan, DIN orange, BLE magenta, network green */
+inline uint16_t sourceColor(MidiSource source)
+{
+  static const uint16_t kColors[kInputs] = {Layout::kUsbColor, Layout::kDinColor, Layout::kBleColor, Layout::kNetColor};
+  return kColors[(int)source & 3];
+}
 
 /*! A rounded, labelled touch target, drawn on `target` (normally the page's canvas) */
 void drawChip(LovyanGFX &target, int x, int y, int w, int h, const char *text, bool on,

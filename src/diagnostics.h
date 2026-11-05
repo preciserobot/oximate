@@ -33,7 +33,7 @@ public:
     if (_reset.exchange(false)) {
       for (auto &input : _counts)
         for (auto &count : input) count = 0;
-      _filtered[0] = _filtered[1] = 0;
+      for (auto &filtered : _filtered) filtered = 0;
     }
   }
 
@@ -67,8 +67,8 @@ public:
   }
 
 private:
-  volatile uint32_t _counts[2][kTypes] = {};
-  volatile uint32_t _filtered[2] = {};
-  volatile uint32_t _lastSeen[2][16] = {};
+  volatile uint32_t _counts[kInputs][kTypes] = {};
+  volatile uint32_t _filtered[kInputs] = {};
+  volatile uint32_t _lastSeen[kInputs][16] = {};
   std::atomic<bool> _reset{false};
 };

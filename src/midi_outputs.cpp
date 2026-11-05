@@ -23,14 +23,33 @@ void MidiOutputs::addListener(Listener listener, void *ctx)
   }
 }
 
+void MidiOutputs::setPort(MidiOutput out, RadioPort *port)
+{
+  if ((int)out >= 2 && (int)out < kOutputs) _ports[(int)out] = port;
+}
+
 bool MidiOutputs::available(MidiOutput out) const
 {
-  return out == MidiOutput::Din || _usb->connected();
+  switch (out) {
+    case MidiOutput::Din: return true;
+    case MidiOutput::Usb: return _usb->connected();
+    default: {
+      RadioPort *port = _ports[(int)out & 3];
+      return port && port->connected();
+    }
+  }
 }
 
 bool MidiOutputs::hasSpace(MidiOutput out, uint16_t length) const
 {
-  return out == MidiOutput::Din ? _din->txSpace() >= length : _usb->txSpace() >= length + 3u;
+  switch (out) {
+    case MidiOutput::Din: return _din->txSpace() >= length;
+    case MidiOutput::Usb: return _usb->txSpace() >= length + 3u;
+    default: {
+      RadioPort *port = _ports[(int)out & 3];
+      return port && port->txSpace() >= length;
+    }
+  }
 }
 
 void MidiOutputs::send(MidiOutput out, const MidiMessage &msg, Origin origin)
@@ -47,8 +66,10 @@ void MidiOutputs::send(MidiOutput out, const MidiMessage &msg, Origin origin)
       sent.length = msg.length;
       memcpy(sent.bytes, msg.bytes, msg.length);
     }
-  } else {
+  } else if (out == MidiOutput::Usb) {
     _usb->send(msg);
+  } else {
+    _ports[(int)out & 3]->send(msg); // available() checked that it exists
   }
   _tracker->sent(out, msg, origin);
   _counters.messages[(int)out]++;

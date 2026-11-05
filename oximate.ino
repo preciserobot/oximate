@@ -56,6 +56,8 @@
 #include "src/scene_page.h"
 #include "src/scenes.h"
 #include "src/phrase_tracker.h"
+#include "src/radio.h"
+#include "src/radio_page.h"
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
@@ -72,6 +74,9 @@
 
 // MIDI side: used only by the MIDI task (core 0) once it has started
 UsbMidi usbMidi;
+RadioConfig radioConfig;              // stages 17/18: radio settings (NVS), mode chosen at boot
+RadioMode radioMode = RadioMode::Off; // what this boot runs
+RadioTransport *radio = nullptr;      // the running BLE or network transport, if any
 DinMidi dinMidi;
 NoteTracker noteTracker;
 MidiOutputs outputs;
@@ -113,6 +118,7 @@ SysExCapture sysexCapture; // stage 14: SysEx tap in the MIDI task, buffer read 
 SysExSender sysexSender;   // stage 14: streams .syx files in the MIDI task
 SysExPage sysexPage(sysexSender, sysexCapture, leds);
 DiagPage diagPage(stats, panic, outputs, dinMidi, usbMidi, leds);
+RadioPage radioPage(radioConfig, router);
 
 /*! Every complete message from any input arrives here, in the MIDI task */
 void onMidi(const MidiMessage &msg)
@@ -129,6 +135,7 @@ void onMidi(const MidiMessage &msg)
 void midiTaskLoop(uint32_t nowMillis)
 {
   router.applyPending(); // settings changed on the UI side, even without MIDI traffic
+  if (radio) radio->poll(); // BLE / network: received messages to onMidi(), queued sends out
   panic.run(nowMillis);
   samSynth.run(nowMillis);
   drumMachine.run(nowMillis);
@@ -148,6 +155,8 @@ void setup()
   Serial.setTxBufferSize(4096); // the monitor prints every line; it must never block the UI
   Serial.begin(115200);
   SpiBus::begin();
+  radioConfig = RadioSettings::load();
+  radioMode = radioConfig.mode; // fixed for this boot; the Radio page reboots to change it
   uint32_t splashStart = millis();
   Ui::splash("starting");
 
@@ -239,6 +248,8 @@ void setup()
   ui.addPage(earPage);
   chordPage.begin();
   ui.addPage(chordPage);
+  radioPage.setRunning(radioMode, radio);
+  ui.addPage(radioPage);
   ui.addPage(diagPage);
 
   InputHooks::addObserver(ClockAnalyser::observer, &clockAnalyser);
@@ -248,7 +259,9 @@ void setup()
   ui.setHooks([] { haptics.service(); }, [] { Cues::post(Cue::TouchTick); });
   panic.begin(outputs, noteTracker, usbMidi, clockEngine);
   MidiTask::setLoopHook(midiTaskLoop);
-  MidiTask::start(usbMidi, dinMidi, clockEngine, outputs);
+  // With a radio on, its stack takes core 0 at high priority: MIDI moves to core 1 (stage 17)
+  MidiTask::start(usbMidi, dinMidi, clockEngine, outputs,
+                  radioMode == RadioMode::Off ? MidiTask::kDefaultCore : MidiTask::kRadioCore);
   Serial.printf("OxiMate running (DIN on GPIO RX %d / TX %d)\n", dinMidi.rxPin(), dinMidi.txPin());
 }
 

@@ -169,7 +169,7 @@ void NoteTracker::forget(MidiOutput out, uint8_t channel, uint8_t note)
 bool NoteTracker::findStuck(uint32_t nowMillis, uint32_t thresholdMillis, MidiOutput &out, HeldNote &stuck) const
 {
   bool found = false;
-  for (int o = 0; o < 2; o++) {
+  for (int o = 0; o < kOutputs; o++) {
     const State &s = _state[o];
     for (const Slot &slot : s.slots) {
       if (slot.channel == kFree) continue;

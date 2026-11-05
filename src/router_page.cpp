@@ -44,9 +44,12 @@ void RouterPage::draw()
   const RouterConfig &c = _router.config();
   canvas().fillRect(0, kContentTop, canvas().width(), kContentHeight, TFT_BLACK);
 
-  drawChip(canvas(), 0 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "USB>DIN", c.usbToDin);
-  drawChip(canvas(), 1 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>DIN", c.dinToDin);
-  drawChip(canvas(), 2 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>USB", c.dinToUsb);
+  drawChip(canvas(), 0 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "USB>DIN",
+           c.routed(MidiSource::Usb, MidiOutput::Din));
+  drawChip(canvas(), 1 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>DIN",
+           c.routed(MidiSource::Din, MidiOutput::Din));
+  drawChip(canvas(), 2 * kRouteChipWidth, kRoutesY, kRouteChipWidth, kChipHeight, "DIN>USB",
+           c.routed(MidiSource::Din, MidiOutput::Usb));
 
   canvas().setTextColor(kUsbColor);
   canvas().drawString("USB in channels", 4, kUsbLabelY);
@@ -76,9 +79,9 @@ void RouterPage::onTouch(int x, int y)
 
   if (inRow(kRoutesY, kChipHeight)) {
     switch (x / kRouteChipWidth) {
-      case 0: c.usbToDin = !c.usbToDin; break;
-      case 1: c.dinToDin = !c.dinToDin; break;
-      default: c.dinToUsb = !c.dinToUsb; break;
+      case 0: c.setRouted(MidiSource::Usb, MidiOutput::Din, !c.routed(MidiSource::Usb, MidiOutput::Din)); break;
+      case 1: c.setRouted(MidiSource::Din, MidiOutput::Din, !c.routed(MidiSource::Din, MidiOutput::Din)); break;
+      default: c.setRouted(MidiSource::Din, MidiOutput::Usb, !c.routed(MidiSource::Din, MidiOutput::Usb)); break;
     }
   } else if (inRow(kUsbGridY, kGridHeight) || inRow(kDinGridY, kGridHeight)) {
     MidiSource input = inRow(kUsbGridY, kGridHeight) ? MidiSource::Usb : MidiSource::Din;
@@ -115,7 +118,7 @@ void RouterPage::onButton(int index)
   RouterConfig &c = _router.config();
   switch (index) {
     case 0:
-      c.channelMask[0] = c.channelMask[1] = 0xFFFF;
+      for (uint16_t &mask : c.channelMask) mask = 0xFFFF;
       break;
     case 1:
       c.ledLevel = (c.ledLevel + 1) % 4;

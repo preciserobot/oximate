@@ -15,8 +15,8 @@ static void noteName(uint8_t note, char *out, size_t size)
 void describeMidi(const MidiMessage &msg, char *out, size_t size, uint16_t totalLength)
 {
   char source[5];
-  if (msg.source == MidiSource::Din) {
-    strcpy(source, "DIN");
+  if (msg.source != MidiSource::Usb) {
+    strcpy(source, sourceName(msg.source)); // DIN, BLE, NET
   } else if (msg.cable == 0) {
     strcpy(source, "USB");
   } else {
@@ -77,7 +77,7 @@ void Monitor::log(const MidiMessage &msg, bool forwarded, uint16_t totalLength)
   }
   char text[kLineLength];
   describeMidi(msg, text, sizeof(text), totalLength);
-  uint16_t color = msg.source == MidiSource::Usb ? kUsbColor : kDinColor;
+  uint16_t color = sourceColor(msg.source);
   addLine(forwarded ? color : kFilteredColor, text);
   // Never wait for the serial port: a burst of messages would stall the UI for 100s of ms
   if (_serialEcho && Serial.availableForWrite() > (int)strlen(text) + 2) Serial.println(text);

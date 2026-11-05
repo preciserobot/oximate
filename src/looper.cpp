@@ -274,7 +274,7 @@ void Looper::observer(const MidiMessage &msg, bool forwarded, void *ctx)
   bool recording = looper->_state == LoopState::Recording ||
                    (looper->_state == LoopState::Looping && looper->_overdub && looper->_loopActive);
   if (!recording) return;
-  uint8_t inputBit = msg.source == MidiSource::Usb ? 1 : 2;
+  uint8_t inputBit = 1 << (int)msg.source; // USB 1, DIN 2, BLE 4, network 8
   if (!(looper->_active.inputs & inputBit)) return;
   if (looper->_active.channel && msg.channel() != looper->_active.channel) return;
 

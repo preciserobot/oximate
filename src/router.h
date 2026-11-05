@@ -1,6 +1,7 @@
 #pragma once
 
 #include "midi_message.h"
+#include "midi_outputs.h"
 #include "sync.h"
 
 class MidiOutputs;
@@ -17,19 +18,36 @@ enum class ClockSource : uint8_t
   Off = 3,
 };
 
-/*! Routing settings, persisted in NVS. Bump kVersion when the layout changes. */
+constexpr uint8_t outputBit(MidiOutput out) { return 1 << (int)out; }
+
+/*! Routing settings, persisted in NVS. Bump kVersion when the layout changes.
+ *  Version 3 (stage 17) replaced the three USB/DIN route flags with a matrix. */
 struct RouterConfig
 {
-  static constexpr uint8_t kVersion = 2;
+  static constexpr uint8_t kVersion = 3;
 
   uint8_t version = kVersion;
-  bool usbToDin = true;                     ///< USB device -> DIN OUT (+ SAM2695)
-  bool dinToDin = true;                     ///< DIN IN -> DIN OUT (software thru)
-  bool dinToUsb = true;                     ///< DIN IN -> USB device
-  uint16_t channelMask[2] = {0xFFFF, 0xFFFF}; ///< per input (MidiSource), bit n = channel n+1 passes
-  uint8_t forceChannel[2] = {0, 0};         ///< per input: 0 = keep, 1..16 = rewrite to this channel
+  /// Per input (MidiSource): the outputs it goes to (outputBit()). Defaults: as before for USB and
+  /// DIN, both also to the radio peers; radio input to DIN and USB (decided 2026-11-05). An
+  /// input never goes back to its own USB device or radio peer. Radio outputs only exist while
+  /// that radio is on, so with the radios off routing is exactly as in version 2.
+  uint8_t routes[kInputs] = {
+      outputBit(MidiOutput::Din) | outputBit(MidiOutput::Ble) | outputBit(MidiOutput::Net),
+      outputBit(MidiOutput::Din) | outputBit(MidiOutput::Usb) | outputBit(MidiOutput::Ble) |
+          outputBit(MidiOutput::Net),
+      outputBit(MidiOutput::Din) | outputBit(MidiOutput::Usb),
+      outputBit(MidiOutput::Din) | outputBit(MidiOutput::Usb)};
+  uint16_t channelMask[kInputs] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}; ///< bit n = channel n+1 passes
+  uint8_t forceChannel[kInputs] = {0, 0, 0, 0}; ///< 0 = keep, 1..16 = rewrite to this channel
   bool sysex = true;
-  uint8_t ledLevel = 2;                     ///< 0 off, 1 low, 2 medium, 3 high
+  uint8_t ledLevel = 2; ///< 0 off, 1 low, 2 medium, 3 high
+
+  bool routed(MidiSource in, MidiOutput out) const { return routes[(int)in] & outputBit(out); }
+  void setRouted(MidiSource in, MidiOutput out, bool on)
+  {
+    if (on) routes[(int)in] |= outputBit(out);
+    else routes[(int)in] &= ~outputBit(out);
+  }
 };
 
 /*! Filters, remaps and forwards merged MIDI according to RouterConfig.

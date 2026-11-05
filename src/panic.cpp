@@ -43,17 +43,17 @@ void Panic::observe(const MidiMessage &msg)
 
 void Panic::releaseFrom(Origin origin)
 {
-  int before = _tracker->heldCount(MidiOutput::Din) + _tracker->heldCount(MidiOutput::Usb);
-  _tracker->release(*_outputs, MidiOutput::Din, &origin);
-  _tracker->release(*_outputs, MidiOutput::Usb, &origin);
-  int after = _tracker->heldCount(MidiOutput::Din) + _tracker->heldCount(MidiOutput::Usb);
+  int before = 0, after = 0;
+  for (int o = 0; o < kOutputs; o++) before += _tracker->heldCount((MidiOutput)o);
+  for (int o = 0; o < kOutputs; o++) _tracker->release(*_outputs, (MidiOutput)o, &origin);
+  for (int o = 0; o < kOutputs; o++) after += _tracker->heldCount((MidiOutput)o);
   _autoReleased += before - after;
 }
 
 void Panic::startJob(uint8_t level)
 {
   _level = level;
-  for (int o = 0; o < 2; o++) {
+  for (int o = 0; o < kOutputs; o++) {
     MidiOutput out = (MidiOutput)o;
     // Level 1: note-offs for what we know is held (and pedals up)
     _tracker->release(*_outputs, out);
@@ -113,25 +113,31 @@ void Panic::run(uint32_t nowMillis)
   }
   bool wasRunning = _level != 0;
   if (_level) {
-    for (int o = 0; o < 2; o++) {
+    bool done = true;
+    for (int o = 0; o < kOutputs; o++) {
       if (!_outputs->available((MidiOutput)o)) _cursor[o].done = true;
       feed((MidiOutput)o);
+      done = done && _cursor[o].done;
     }
-    if (_cursor[0].done && _cursor[1].done) {
-      _tracker->clear(MidiOutput::Din);
-      _tracker->clear(MidiOutput::Usb);
+    if (done) {
+      for (int o = 0; o < kOutputs; o++) _tracker->clear((MidiOutput)o);
       _panics++;
       _level = 0;
     }
   }
 
-  // USB device unplugged: it can't receive note-offs any more, and its notes on DIN must end
-  bool usbConnected = _usb->connected();
-  if (_usbWasConnected && !usbConnected) {
-    _tracker->clear(MidiOutput::Usb);
-    releaseFrom(Origin::fromInput(MidiSource::Usb));
+  // USB device unplugged or radio peer gone: it can't receive note-offs any more, and the notes it
+  // played elsewhere must end (USB, BLE and network: output n is the same device as input n)
+  for (int o = 1; o < kOutputs; o++) {
+    bool available = _outputs->available((MidiOutput)o);
+    if (_wasAvailable[o] && !available) {
+      _tracker->clear((MidiOutput)o);
+      static const MidiSource kSameDevice[kOutputs] = {MidiSource::Din, MidiSource::Usb, MidiSource::Ble,
+                                                       MidiSource::Net};
+      releaseFrom(Origin::fromInput(kSameDevice[o]));
+    }
+    _wasAvailable[o] = available;
   }
-  _usbWasConnected = usbConnected;
 
   // DIN sender stopped its Active Sensing: release its notes, as the MIDI spec asks receivers to
   if (_dinSensing && nowMillis - _lastSensingMillis > kActiveSensingMillis) {
@@ -148,7 +154,7 @@ void Panic::run(uint32_t nowMillis)
 void Panic::updateSummary()
 {
   Summary s;
-  for (int o = 0; o < 2; o++) {
+  for (int o = 0; o < kOutputs; o++) {
     s.held[o] = _tracker->heldCount((MidiOutput)o);
     s.sustain[o] = __builtin_popcount(_tracker->sustainMask((MidiOutput)o));
   }
@@ -159,7 +165,7 @@ void Panic::updateSummary()
   uint32_t total = kAllOffMessages + (_level >= 3 ? kBruteMessages : 0);
   uint32_t sent = 0;
   int outputs = 0;
-  for (int o = 0; o < 2; o++) {
+  for (int o = 0; o < kOutputs; o++) {
     if (_outputs->available((MidiOutput)o)) {
       sent += _cursor[o].done ? total : _cursor[o].index;
       outputs++;

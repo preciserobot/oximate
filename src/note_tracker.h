@@ -66,5 +66,5 @@ private:
   void freeSlot(State &s, uint8_t channel, uint8_t note);
   void clearChannel(State &s, uint8_t channel);
 
-  State _state[2];
+  State _state[kOutputs];
 };

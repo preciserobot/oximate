@@ -19,7 +19,7 @@ bool ChordInput::passes(int input, uint8_t channel) const
 
 void ChordInput::observe(const MidiMessage &msg, uint32_t nowMillis)
 {
-  if (!msg.isChannel()) return;
+  if (!msg.isChannel() || !isWired(msg.source)) return;
   int input = (int)msg.source;
   uint8_t channel = msg.channel(); // 1-16
   uint8_t type = msg.status() & 0xF0;

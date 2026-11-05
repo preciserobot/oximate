@@ -24,6 +24,34 @@ struct RouterConfigV1
   uint8_t ledLevel;
 };
 
+/*! Layout of version 2 settings (stages 8-16), for migration */
+struct RouterConfigV2
+{
+  uint8_t version;
+  bool usbToDin, dinToDin, dinToUsb;
+  uint16_t channelMask[2];
+  uint8_t forceChannel[2];
+  bool sysex;
+  uint8_t ledLevel;
+};
+
+/*! The USB/DIN part of an older layout as a version 3 config, with the default radio routes */
+static RouterConfig fromWired(bool usbToDin, bool dinToDin, bool dinToUsb, const uint16_t mask[2],
+                              const uint8_t force[2], bool sysex, uint8_t ledLevel)
+{
+  RouterConfig c;
+  c.setRouted(MidiSource::Usb, MidiOutput::Din, usbToDin);
+  c.setRouted(MidiSource::Din, MidiOutput::Din, dinToDin);
+  c.setRouted(MidiSource::Din, MidiOutput::Usb, dinToUsb);
+  c.channelMask[0] = mask[0];
+  c.channelMask[1] = mask[1];
+  c.forceChannel[0] = force[0];
+  c.forceChannel[1] = force[1];
+  c.sysex = sysex;
+  c.ledLevel = ledLevel;
+  return c;
+}
+
 void Router::begin(MidiOutputs &outputs, ClockEngine &clock)
 {
   _outputs = &outputs;
@@ -58,9 +86,8 @@ void Router::apply()
 bool Router::routingChanged(const RouterConfig &a, const RouterConfig &b, MidiSource input)
 {
   int i = (int)input;
-  if (a.channelMask[i] != b.channelMask[i] || a.forceChannel[i] != b.forceChannel[i]) return true;
-  return input == MidiSource::Usb ? a.usbToDin != b.usbToDin
-                                  : (a.dinToDin != b.dinToDin || a.dinToUsb != b.dinToUsb);
+  return a.channelMask[i] != b.channelMask[i] || a.forceChannel[i] != b.forceChannel[i] ||
+         a.routes[i] != b.routes[i];
 }
 
 void Router::applyPending()
@@ -74,12 +101,12 @@ void Router::applyPending()
   }
   // Notes started under the old routing get their note-offs now, on the same output and
   // channel, before the new settings could send the note-off somewhere else
-  for (MidiSource input : {MidiSource::Usb, MidiSource::Din}) {
+  for (int i = 0; i < kInputs; i++) {
+    MidiSource input = (MidiSource)i;
     if (routingChanged(_active, next, input)) {
       Origin origin = Origin::fromInput(input);
-      _outputs->tracker().release(*_outputs, MidiOutput::Din, &origin);
-      _outputs->tracker().release(*_outputs, MidiOutput::Usb, &origin);
-      if (_fx) _fx->reset(input); // its remembered notes were just released
+      for (int o = 0; o < kOutputs; o++) _outputs->tracker().release(*_outputs, (MidiOutput)o, &origin);
+      if (_fx && isWired(input)) _fx->reset(input); // its remembered notes were just released
     }
   }
   _active = next;
@@ -133,41 +160,43 @@ bool Router::route(const MidiMessage &msg)
 
   // Stage 11: the effect chain takes over while it has something to do; it sends what it
   // produces through sendToDestinations()
-  if (_fx && out.isChannel() && _fx->engaged(msg.source)) {
+  if (_fx && isWired(msg.source) && out.isChannel() && _fx->engaged(msg.source)) {
     _fx->process(out);
     return hasDestination(config, msg.source);
   }
   return sendToDestinations(config, out);
 }
 
+/*! An input never goes back to its own USB device or radio peer (DIN -> DIN is the software thru) */
+static bool ownPort(MidiSource input, MidiOutput out)
+{
+  return (input == MidiSource::Usb && out == MidiOutput::Usb) || (input == MidiSource::Ble && out == MidiOutput::Ble) ||
+         (input == MidiSource::Net && out == MidiOutput::Net);
+}
+
 bool Router::hasDestination(const RouterConfig &config, MidiSource input) const
 {
-  return input == MidiSource::Usb ? config.usbToDin
-                                  : (config.dinToDin || (config.dinToUsb && _outputs->available(MidiOutput::Usb)));
+  for (int o = 0; o < kOutputs; o++) {
+    MidiOutput out = (MidiOutput)o;
+    if (out == MidiOutput::Din && config.routed(input, out)) return true; // DIN is always there
+    if (config.routed(input, out) && !ownPort(input, out) && _outputs->available(out)) return true;
+  }
+  return false;
 }
 
 bool Router::sendToDestinations(const RouterConfig &config, MidiMessage out)
 {
   Origin origin = Origin::fromInput(out.source);
   bool sent = false;
-  switch (out.source) {
-    case MidiSource::Usb:
-      if (config.usbToDin) {
-        _outputs->send(MidiOutput::Din, out, origin);
-        sent = true;
-      }
-      break;
-    case MidiSource::Din:
-      if (config.dinToDin) {
-        _outputs->send(MidiOutput::Din, out, origin);
-        sent = true;
-      }
-      if (config.dinToUsb && _outputs->available(MidiOutput::Usb)) {
-        out.cable = 0;
-        _outputs->send(MidiOutput::Usb, out, origin);
-        sent = true;
-      }
-      break;
+  uint8_t cable = out.cable;
+  // In output order (DIN, USB, BLE, network): with the radios off this is exactly the old routing
+  for (int o = 0; o < kOutputs; o++) {
+    MidiOutput destination = (MidiOutput)o;
+    if (!config.routed(out.source, destination) || ownPort(out.source, destination)) continue;
+    if (!_outputs->available(destination)) continue;
+    out.cable = destination == MidiOutput::Usb ? 0 : cable;
+    _outputs->send(destination, out, origin);
+    sent = true;
   }
   return sent;
 }
@@ -206,19 +235,18 @@ void Router::load()
     return; // nothing saved yet
   }
   RouterConfig stored;
+  RouterConfigV2 v2;
   RouterConfigV1 old;
   size_t length = prefs.getBytesLength(kKey);
   if (length == sizeof(stored) && prefs.getBytes(kKey, &stored, sizeof(stored)) == sizeof(stored) &&
       stored.version == RouterConfig::kVersion) {
     _edit = stored;
+  } else if (length == sizeof(v2) && prefs.getBytes(kKey, &v2, sizeof(v2)) == sizeof(v2) && v2.version == 2) {
+    _edit = fromWired(v2.usbToDin, v2.dinToDin, v2.dinToUsb, v2.channelMask, v2.forceChannel, v2.sysex, v2.ledLevel);
+    _dirty = true; // rewrite in the new layout
   } else if (length == sizeof(old) && prefs.getBytes(kKey, &old, sizeof(old)) == sizeof(old) && old.version == 1) {
-    _edit.usbToDin = old.usbToDin;
-    _edit.dinToDin = old.dinToDin;
-    _edit.dinToUsb = old.dinToUsb;
-    memcpy(_edit.channelMask, old.channelMask, sizeof(old.channelMask));
-    memcpy(_edit.forceChannel, old.forceChannel, sizeof(old.forceChannel));
-    _edit.sysex = old.sysex;
-    _edit.ledLevel = old.ledLevel;
+    _edit = fromWired(old.usbToDin, old.dinToDin, old.dinToUsb, old.channelMask, old.forceChannel, old.sysex,
+                      old.ledLevel);
     _migrated = true;
     _migratedClock = old.clock;
     _dirty = true; // rewrite in the new layout

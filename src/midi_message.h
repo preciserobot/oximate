@@ -8,7 +8,22 @@ enum class MidiSource : uint8_t
 {
   Usb = 0, ///< USB MIDI device on the USB host module
   Din = 1, ///< 5-pin DIN / TRS input of the Unit MIDI
+  Ble = 2, ///< Bluetooth LE MIDI (stage 17; only while the radio mode is BLE)
+  Net = 3, ///< RTP-MIDI over Wi-Fi (stage 18; only while the radio mode is Wi-Fi)
 };
+
+/*! Number of MidiSource values: size of every per-input array */
+constexpr int kInputs = 4;
+
+/*! The wired inputs (USB, DIN) have the full feature set (filters on the Router page, effects,
+ *  clock following, chord input ...); the radio inputs are routed, monitored and counted */
+inline bool isWired(MidiSource source) { return (int)source < 2; }
+
+inline const char *sourceName(MidiSource source)
+{
+  static const char *const kNames[kInputs] = {"USB", "DIN", "BLE", "NET"};
+  return kNames[(int)source & 3];
+}
 
 /*! A complete MIDI message (never running status, never a SysEx fragment).
  *  `bytes` is only valid for the duration of the handler call. */

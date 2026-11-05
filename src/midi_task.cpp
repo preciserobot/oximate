@@ -108,8 +108,13 @@ bool MidiTask::send(MidiOutput out, const uint8_t *bytes, uint8_t length, Origin
   return gSendQueue.push(out, bytes, length, origin);
 }
 
-void MidiTask::start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs &outputs)
+static int gCore = MidiTask::kDefaultCore;
+
+int MidiTask::core() { return gCore; }
+
+void MidiTask::start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs &outputs, int core)
 {
+  gCore = core;
   gOutputs = &outputs;
   gUsb = &usb;
   gDin = &din;
@@ -118,7 +123,7 @@ void MidiTask::start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs
   args.callback = onTimer;
   args.name = "midi-clock";
   esp_timer_create(&args, &gTimer); // before the task: it arms the timer straight away
-  xTaskCreatePinnedToCore(run, "midi", kStackBytes, nullptr, kPriority, &gTask, kCore);
+  xTaskCreatePinnedToCore(run, "midi", kStackBytes, nullptr, kPriority, &gTask, core);
 }
 
 void MidiTask::setLoopHook(void (*hook)(uint32_t)) { gHook = hook; }

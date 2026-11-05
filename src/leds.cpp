@@ -53,7 +53,8 @@ void Leds::setLevel(uint8_t level)
 
 void Leds::activity(const MidiMessage &msg)
 {
-  Flash &flash = _flash[(int)msg.source];
+  // Two strips: radio input (BLE, network) flashes on the USB side
+  Flash &flash = _flash[msg.source == MidiSource::Din ? 1 : 0];
   uint8_t type = msg.status() & 0xF0;
   if (type == 0x90 && msg.bytes[2] > 0) {
     flash.color = noteColor(msg.bytes[1]);

@@ -155,7 +155,7 @@ static void testRouter()
   CHECK(rig.tracker.isHeld(MidiOutput::Din, 9, 60)); // tracked on the channel actually sent
 
   // Edits to config() don't reach the MIDI side until changed()
-  r.config().usbToDin = false;
+  r.config().setRouted(MidiSource::Usb, MidiOutput::Din, false);
   CHECK(r.route(note));
   r.changed();
   CHECK(!r.route(note));
@@ -175,7 +175,7 @@ static void testRouter()
   CHECK(!r.route(sysex));
 
   r.resetDefaults();
-  CHECK(r.config().usbToDin && r.config().channelMask[1] == 0xFFFF);
+  CHECK(r.config().routed(MidiSource::Usb, MidiOutput::Din) && r.config().channelMask[1] == 0xFFFF);
 
   // DIN -> USB only once a device is connected
   rig.dinBytes();
@@ -502,7 +502,9 @@ static void testRouterMigration()
   ClockSource migrated;
   CHECK(router.migratedClock(migrated) && migrated == ClockSource::Usb);
   const RouterConfig &c = router.config();
-  CHECK(c.version == 2 && !c.dinToDin && c.channelMask[0] == 0x7FFF && c.forceChannel[0] == 3 && c.ledLevel == 3);
+  CHECK(c.version == 3 && !c.routed(MidiSource::Din, MidiOutput::Din) && c.routed(MidiSource::Din, MidiOutput::Usb) &&
+        c.routed(MidiSource::Usb, MidiOutput::Din) && c.channelMask[0] == 0x7FFF && c.forceChannel[0] == 3 &&
+        c.ledLevel == 3);
 
   clock.migrateFromRouter(ClockMode::FollowUsb, false);
   CHECK(clock.config().mode == ClockMode::FollowUsb);

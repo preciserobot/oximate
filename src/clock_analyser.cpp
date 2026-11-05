@@ -13,6 +13,7 @@ void ClockAnalyser::observer(const MidiMessage &msg, bool, void *ctx)
 
 void ClockAnalyser::onMessage(const MidiMessage &msg, uint32_t nowMillis)
 {
+  if (!isWired(msg.source)) return; // clock over radio isn't used (decided 2026-11-05)
   int input = (int)msg.source;
   uint32_t previous = 0;
   uint32_t ticks = 0;

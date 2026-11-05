@@ -25,8 +25,8 @@ public:
 
   struct Summary
   {
-    uint16_t held[2];    ///< held + sustained notes per output
-    uint16_t sustain[2]; ///< channels with the pedal down per output
+    uint16_t held[kOutputs];    ///< held + sustained notes per output
+    uint16_t sustain[kOutputs]; ///< channels with the pedal down per output
     uint32_t panics;     ///< completed panic requests
     uint32_t autoReleased;
     bool active;         ///< a panic is being sent
@@ -72,10 +72,10 @@ private:
 
   // MIDI task state
   uint8_t _level = 0; ///< running job level, 0 = idle
-  Cursor _cursor[2] = {};
+  Cursor _cursor[kOutputs] = {};
+  bool _wasAvailable[kOutputs] = {}; ///< USB device / radio peer connected at the last run()
   uint32_t _panics = 0;
   uint32_t _autoReleased = 0;
-  bool _usbWasConnected = false;
   bool _dinSensing = false;
   uint32_t _lastSensingMillis = 0;
   uint32_t _lastSummary = 0;

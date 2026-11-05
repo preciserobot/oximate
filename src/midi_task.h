@@ -74,11 +74,13 @@ class ClockEngine;
  *  through events(). */
 namespace MidiTask
 {
-constexpr int kCore = 0;      ///< see README "Shared infrastructure" (radio stacks may need core 1)
-constexpr int kPriority = 10; ///< above loopTask (1), below the radio stacks (18-23)
+constexpr int kDefaultCore = 0; ///< with the radios off: core 0 is otherwise idle
+constexpr int kRadioCore = 1;   ///< BLE / Wi-Fi stacks run on core 0 at priorities 18-23 (stage 17)
+constexpr int kPriority = 10;   ///< above loopTask (1), below the radio stacks (18-23)
 constexpr uint32_t kStackBytes = 8192;
 
-void start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs &outputs);
+void start(UsbMidi &usb, DinMidi &din, ClockEngine &clock, MidiOutputs &outputs, int core = kDefaultCore);
+int core(); ///< the core the task was started on
 /*! UI side: send a message from the MIDI task (sent within ~1 ms); false if the queue is full */
 bool send(MidiOutput out, const uint8_t *bytes, uint8_t length, Origin origin);
 /*! Extra work for every task loop (router hand-over, panic, statistics); set before start() */
