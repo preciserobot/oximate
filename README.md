@@ -249,6 +249,7 @@ piece is built by the first stage that needs it.
 | Channel 16 | no gear uses it. Reserved for SAM2695 settings |
 | Elektron gear | it responds on all channels, so in Separate mode it receives synth-setup program changes (channel 16) and trainer notes (channel 15). **Program changes switch Elektron patterns.** Either turn off program-change receive (or the relevant channels) in the Elektron MIDI settings, or put the Unit MIDI in **Bypass** while using stages 6/7. Stage 6 shows a warning about this |
 | Clock output | sent to **USB by default**, switchable to DIN (per output) |
+| BLE / network MIDI (stages 17, 18) | one radio at a time (switching reboots); radio input routed by default; **no clock over radio**; BLE: iPad + Mac as peripheral **and central mode** (BLE controllers, possibly the Oxi One); network: Mac or iPad, OxiMate's **own network** by default (joining an existing one optional), Wi-Fi power save off while network MIDI is on |
 | External clock lost | OxiMate **stops** |
 | Panic trigger | **power button** (short press = levels 1+2, ~1.5 s hold = level 3) |
 | Panic and transport | panic also sends **Stop** (`FC`) |

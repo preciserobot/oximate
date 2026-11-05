@@ -4,6 +4,14 @@
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 > Shares the "Radio" mode switch, the N-input/N-output generalisation and the route matrix with
 > stage 17 (BLE MIDI). Whichever of 17 and 18 is built first does that groundwork (M1–M2).
+>
+> **Decided 2026-11-05:**
+>
+> * Switching radio mode reboots: accepted. Network input is **routed by default**. **No clock**
+>   over the network.
+> * Hosts: **Mac or iPad** (both have built-in RTP-MIDI session support).
+> * OxiMate makes **its own network** by default; joining an existing network is an option.
+> * Wi-Fi power save is **always off while network MIDI is on**.
 
 MIDI between OxiMate and a Mac (or any RTP-MIDI host) over Wi-Fi, using the
 **RTP-MIDI / AppleMIDI** protocol that macOS supports natively (Audio MIDI Setup →
