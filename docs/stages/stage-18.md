@@ -1,6 +1,6 @@
 # Stage 18: Network MIDI
 
-> **Status: plan, not implemented.** Written 2026-11-01. Where this plan and the README's
+> **Status: implemented 2026-11-05 (needs hardware test; see the README for the differences).** Written 2026-11-01. Where this plan and the README's
 > [Shared infrastructure](../../README.md#shared-infrastructure) section disagree, the README wins.
 > Shares the "Radio" mode switch, the N-input/N-output generalisation and the route matrix with
 > stage 17 (BLE MIDI). Whichever of 17 and 18 is built first does that groundwork (M1–M2).

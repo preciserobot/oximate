@@ -59,6 +59,7 @@
 #include "src/radio.h"
 #include "src/radio_page.h"
 #include "src/ble_midi.h"
+#include "src/net_midi.h"
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
@@ -229,6 +230,8 @@ void setup()
   SdStore::begin([] { return clockEngine.snapshot().running; }); // 1 KB chunks while the clock runs
 
   // Stage 17/18: the radio chosen for this boot (on the heap: nothing is used while it is off)
+  // Each firmware has one radio (see radio.h); the other one's mode runs as Off here
+#if !defined(OXIMATE_WIFI)
   if (radioMode == RadioMode::Ble) {
     Ui::splash("Bluetooth");
     BleMidi *ble = new BleMidi();
@@ -239,6 +242,17 @@ void setup()
       Serial.println("BLE init failed");
     }
   }
+#else
+  if (radioMode == RadioMode::Wifi) {
+    Ui::splash("Wi-Fi");
+    NetMidi *net = new NetMidi();
+    if (net->begin(radioConfig, onMidi)) {
+      radio = net;
+      outputs.setPort(MidiOutput::Net, net);
+    }
+  }
+#endif
+  if (!radio) radioMode = RadioMode::Off;
 
   // Keep the start-up screen up for at least 3 s, then the pages take over
   while (millis() - splashStart < 3000) delay(10);

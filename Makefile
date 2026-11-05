@@ -1,5 +1,5 @@
 # Created By: zapTheGoose
-.PHONY: all build send test log
+.PHONY: all build send build-wifi send-wifi test log
 
 PORT ?= /dev/cu.usbserial-58620052741
 
@@ -25,6 +25,20 @@ send:
 	arduino-cli upload \
 		--port $(PORT) \
 		--fqbn esp32:esp32:m5stack_core2
+
+# Stage 18: the Wi-Fi firmware (BLE and Wi-Fi don't fit in IRAM together, see src/radio.h). It
+# lives in app slot 1 (0x650000, default 16 MB partition table); `make send` keeps slot 0 (BLE)
+# and boots it. The Radio page switches between the two.
+ESPTOOL ?= $(firstword $(wildcard $(HOME)/Library/Arduino15/packages/esp32/tools/esptool_py/*/esptool))
+build-wifi: libraries/USB_Host_Shield_2.0/.patched
+	time arduino-cli compile \
+		--fqbn esp32:esp32:m5stack_core2 \
+		--libraries libraries \
+		--build-property build.defines=-DOXIMATE_WIFI \
+		--build-path build/wifi
+
+send-wifi:
+	$(ESPTOOL) --chip esp32 --port $(PORT) --baud 921600 write-flash 0x650000 build/wifi/oximate.ino.bin
 
 
 # Host unit tests (no hardware needed)

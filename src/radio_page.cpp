@@ -26,7 +26,7 @@ void RadioPage::buttonLabels(const char *labels[3]) const
     labels[2] = _config.peerAddress[0] ? "Forget" : "";
   } else {
     labels[1] = "";
-    labels[2] = "";
+    labels[2] = _running == RadioMode::Wifi && _config.ssid[0] ? "Forget" : "";
   }
 }
 
@@ -42,6 +42,12 @@ void RadioPage::onButton(int index)
     case 0:
       if (_config.mode != _running) {
         RadioSettings::save(_config);
+        if (inOtherFirmware() && !RadioFirmware::bootOther()) {
+          // The other radio's firmware isn't in the other app slot (yet)
+          if (ui()) ui()->flash(kBuiltRadio == RadioMode::Ble ? "Not installed: make send-wifi" : "Not installed: make send",
+                                TFT_RED, 3000);
+          break;
+        }
 #if defined(ESP_PLATFORM)
         if (ui()) ui()->flash("Rebooting", TFT_DARKGREY, 2000);
         delay(300);
@@ -59,6 +65,13 @@ void RadioPage::onButton(int index)
     case 2:
       if (_running == RadioMode::Ble && _transport && _config.peerAddress[0]) {
         _transport->forget(_config);
+        RadioSettings::save(_config);
+        markDirty();
+      } else if (_running == RadioMode::Wifi && _config.ssid[0]) {
+        // The saved network (entered on the setup page); the own access point from the next boot
+        _config.ssid[0] = 0;
+        _config.password[0] = 0;
+        _config.joinNetwork = false;
         RadioSettings::save(_config);
         markDirty();
       }
@@ -135,8 +148,8 @@ void RadioPage::drawMain()
   }
   char text[48];
   if (_config.mode != _running) {
-    snprintf(text, sizeof(text), "Running: %s - A reboots into %s", kModeNames[(int)_running],
-             kModeNames[(int)_config.mode]);
+    snprintf(text, sizeof(text), inOtherFirmware() ? "Running: %s - A: %s firmware" : "Running: %s - A reboots into %s",
+             kModeNames[(int)_running], kModeNames[(int)_config.mode]);
     c.setTextColor(TFT_YELLOW, TFT_BLACK);
   } else {
     snprintf(text, sizeof(text), "Running: %s  (MIDI task on core %d)", kModeNames[(int)_running],
@@ -185,12 +198,15 @@ void RadioPage::drawMain()
   } else {
     drawChip(c, 0, kOptionsY, 200, kChipH, _config.joinNetwork ? "Join network" : "Own access point",
              _config.joinNetwork);
+    c.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    c.setCursor(206, kOptionsY + 5);
+    c.printf("%.13s", _config.ssid[0] ? _config.ssid : "(none saved)");
   }
   c.setFont(&fonts::Font0);
   c.setTextColor(TFT_DARKGREY, TFT_BLACK);
   c.setCursor(2, kOptionsY + kChipH + 6);
-  c.print(_running == RadioMode::Ble ? "Central mode and device changes apply at the next boot."
-                                     : "Network choice applies at the next boot. No clock over radio.");
+  c.print(_running == RadioMode::Ble ? "Central on/off applies at the next boot."
+                                     : "Next boot. Join a network: setup page on the AP.");
   c.setFont(&fonts::AsciiFont8x16);
 }
 

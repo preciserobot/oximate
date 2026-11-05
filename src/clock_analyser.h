@@ -39,7 +39,7 @@ private:
   CriticalSection _lock;
   ClockStats _stats[2];
   ClockPhase _phase;
-  ClockStats _uiCopy;
+  ClockStats *_uiCopy = nullptr; ///< heap, not static: the Wi-Fi firmware needs the static RAM (stage 18)
 
   std::atomic<bool> _csv{false};
   CsvRecord _records[kCsvLength];

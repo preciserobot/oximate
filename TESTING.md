@@ -313,6 +313,48 @@ the Oxi, a synth. PCs are **off** per device until you switch them on.
 - [ ] Panic during a pending recall: the recall is cancelled
   > Did any program change reach a device that had "PC off"?
 
+## 18. BLE MIDI (stage 17)
+
+Radio page (before Diag). Flash both firmwares once: `make build && make send`, then
+`make build-wifi && make send-wifi`. With the radio Off, everything must behave as before.
+
+- [ ] Radio Off (default): routing, clock and USB/DIN timing unchanged; Diag free heap noted
+  > Free heap (Off / BLE / Wi-Fi):
+- [ ] Pick BLE, A Reboot: boots into BLE; the info line says "MIDI task on core 1"
+- [ ] iPad (e.g. an app's Bluetooth MIDI dialog) finds "OxiMate" and connects; status shows 1 host
+- [ ] Mac: Audio MIDI Setup → MIDI Studio → Bluetooth → connect "OxiMate"
+- [ ] Notes and CCs iPad → OxiMate: on the Monitor as BLE (magenta), out on DIN and USB
+- [ ] DIN/USB → iPad: notes arrive; 100-note burst complete (rx/tx/fail/drop on the Radio page)
+- [ ] SysEx (e.g. an identity request) both ways
+- [ ] No clock: with OxiMate's clock running, the iPad receives no clock; iPad clock is ignored
+- [ ] Route chips (BLE>DIN etc.) switch routes off and on
+- [ ] Disconnect the iPad while notes are held: no stuck notes on DIN/USB
+- [ ] Central on (reboot), B Devices: the Oxi One (or another BLE MIDI device) is listed; tap connects; status "connected"
+- [ ] Power-cycle both: OxiMate reconnects to the remembered device by itself; C Forget stops it
+- [ ] USB gap max and DIN clock jitter with BLE on (Diag / Analyse) vs off
+  > Numbers, latency feel:
+
+## 19. Network MIDI (stage 18)
+
+Pick Wi-Fi on the Radio page; A boots the Wi-Fi firmware (slot 1; "Not installed" means
+`make send-wifi` is missing).
+
+- [ ] Own access point: "OxiMate-xxxx" and its password on the Radio page; the Mac joins it
+- [ ] Audio MIDI Setup → MIDI Studio → Network: "OxiMate" in the directory (else add 192.168.4.1 port 5004 by hand); Connect
+  > Listed automatically?
+- [ ] Radio page shows the session name, latency and rx/tx
+- [ ] Notes and CCs both ways (DAW ↔ DIN/USB); 100-message burst complete; lost stays 0
+- [ ] SysEx over 500 bytes from DIN reaches the Mac complete (segmented)
+- [ ] No clock to or from the network
+- [ ] Disconnect in Audio MIDI Setup (or sleep the Mac) with notes held: no stuck notes
+- [ ] iPad session app: connects too (only one session at a time: the second host is refused)
+- [ ] Setup page: on the access point open http://192.168.4.1, pick a network, save; OxiMate reboots and joins it ("Joined …", its IP)
+- [ ] Wrong password: after about 20 s the own access point is back, the page says the join failed
+- [ ] C Forget, reboot: own access point again
+- [ ] Choose BLE on the Radio page, A: boots the BLE firmware with all settings kept
+- [ ] Battery drain over 30 min with Wi-Fi on vs off
+  > mA / % per 30 min:
+
 ## Other notes
 
 >

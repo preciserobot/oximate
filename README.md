@@ -34,8 +34,8 @@ synth.
 | 14 | [SysEx librarian](#stage-14-sysex-librarian) | ✅ | needs hardware test |
 | 15 | [Setlist / scenes](#stage-15-setlist--scenes) | ✅ | needs hardware test |
 | 16 | [Panic & diagnostics](#stage-16-panic--diagnostics) | ✅ | needs hardware test |
-| 17 | [BLE MIDI](#stage-17-ble-midi) | — | planned (full plan) |
-| 18 | [Network MIDI](#stage-18-network-midi) | — | planned (full plan) |
+| 17 | [BLE MIDI](#stage-17-ble-midi) | ✅ | needs hardware test |
+| 18 | [Network MIDI](#stage-18-network-midi) | ✅ | needs hardware test |
 | 19 | [Extra controls](#stage-19-extra-controls) | — | planned (full plan) |
 | 20 | [DFAM MIDI-to-CV](#stage-20-dfam-midi-to-cv) | — | planned (full plan; needs the CV board) |
 | 21 | [Chord detector](#stage-21-chord-detector) | ✅ | needs hardware test |
@@ -102,7 +102,7 @@ the USB Host Module.
 * **Switch page:** **swipe left or right** across the screen, at least half
   its width (left = next page, right = previous), or tap the header bar at the top. The page
   name with `>` on the left of the header shows where you are: Monitor →
-  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Set → Loop → SysEx → Ear → Chord → Diag → Monitor.
+  Router → FX → Synth → Drums → Gen → Clock → Analyse → Phrase → Set → Loop → SysEx → Ear → Chord → Radio → Diag → Monitor.
 * **Header bar** (always visible): page name, `USB ok` / `USB --`, clock
   source, tempo and transport, a cyan `SPK` while the built-in speaker is the
   output, and on the right the battery level (green
@@ -139,6 +139,7 @@ the USB Host Module.
 | Ear (trainer) | Replay | Next (Skip before answering) | Level 1 → 4 → Auto |
 | Ear (explorer) | Play | Next inversion | Block / Arpeggio |
 | Chord | Clear history and held notes (hold: freeze / unfreeze) | Full / simple (big chord) view | Sharps / flats |
+| Radio | Reboot into the chosen radio mode (shown only when it differs from the running one; boots the other firmware for the other radio) | BLE with central on: Devices (scan; tap a device to connect and remember it; then B scans again, C goes back) | Forget the remembered BLE device / the saved Wi-Fi network |
 | Diag | Reset counters | Next view (hold: test note, middle C on channel 1 to DIN OUT and the synth) | Panic (hold: panic all) |
 
 ### What runs when
@@ -237,6 +238,10 @@ piece is built by the first stage that needs it.
 | `music_theory` | 7 / 21 | note names, interval/chord/scale tables, pitch-class sets, exact chord matching with inversions. **Created by stage 7**; stage 21 extends the chord table (appending after `Add9`) and adds the scoring matcher both use |
 | `SamSynth::claimPart()` | 6 / 7 | parts 5–14 for other stages: `claimPart(channel)`, `setPart()`, `releasePart()`; set up via the config channel, re-applied after resets (added by stage 7) |
 | `ChordInput` | 21 | input observer in the MIDI task: the exact set of notes held at the inputs, published as a snapshot |
+| `kInputs` / `kOutputs` | 17 | four inputs (`MidiSource` USB, DIN, BLE, NET) and four outputs (`MidiOutput` DIN, USB, BLE, NET); every per-input/per-output array uses these. `isWired()`: only USB and DIN have filters, effects, clock following and chord input |
+| Route matrix | 17 | `RouterConfig` v3: `routes[input]` is a bit mask of outputs (`routed()`, `setRouted()`), plus channel mask and force channel per input; v1/v2 settings migrate. Never back to the same device (USB→USB, BLE→BLE, NET→NET) |
+| `RadioPort` / `RadioTransport` | 17 | a radio output for `MidiOutputs` (`setPort()`), and the transport interface (begin in setup, `poll()` in the MIDI task, status/scan on the UI side). `RadioConfig` in NVS (key `radio`); mode chosen at boot. No clock over radio (`radioCarries()`) |
+| `PacketRing` | 17 | single-producer single-consumer ring of variable-length packets between a radio stack's task and the MIDI task |
 
 ### Decisions (2026-11-01)
 
@@ -951,6 +956,37 @@ Wireless MIDI to and from an iPad or Mac. The ESP32 supports BLE MIDI
 natively, and the `BLE-MIDI`/NimBLE libraries are already installed.
 
 **Plan (2026-11-01):** BLE MIDI peripheral (iPad/Mac) on NimBLE 2.x, using our own thin transport because the installed BLE-MIDI library doesn't match NimBLE 2.x. The MIDI task moves to core 1 while a radio is on. Also covers the shared groundwork: more inputs and outputs, a route matrix (RouterConfig v3), and a Radio page with a mode chosen at boot.
+
+**Implemented (2026-11-05)**, decisions of 2026-11-05 applied:
+
+* **Radio page** (before Diag): mode Off / BLE / Wi-Fi (saved, A reboots into it), the running
+  radio's status, its four routes (BLE>DIN, BLE>USB, DIN>BLE, USB>BLE; all on by default), and
+  the option chip (BLE: Central on/off; Wi-Fi: own access point / join network).
+* **Peripheral, always:** OxiMate advertises as "OxiMate" with the BLE MIDI service; iPad (an
+  app's Bluetooth MIDI dialog) and Mac (Audio MIDI Setup → Bluetooth) connect. Up to two hosts.
+* **Central, optional** (for a BLE controller or the Oxi One): B Devices scans, a tap connects
+  and remembers the device, and OxiMate reconnects to it whenever it is around. C forgets it.
+* **No clock over radio** in either direction: clock and Start/Stop/Continue are dropped.
+* Own packet codec (`src/ble_midi_codec.*`, host-tested: timestamps, running status, SysEx across
+  packets, real-time inside messages), packets sized to the negotiated MTU.
+* The MIDI task runs on core 1 while a radio is on (the BLE/Wi-Fi stacks own core 0).
+
+Differences from the plan:
+
+* **Two firmwares:** the BLE controller and the Wi-Fi stack don't fit in the ESP32's IRAM
+  together with the precompiled Arduino core (3.4 KB over). `make build`/`make send` is the BLE
+  firmware (app slot 0); `make build-wifi`/`make send-wifi` the Wi-Fi firmware (slot 1). Settings
+  are shared; choosing the other radio and A boots the other slot (or says it isn't installed).
+* NimBLE-Arduino 2.5.0 is pinned in `libraries/` by the Makefile (the sketchbook copy was
+  incomplete). OxiMate tells the core it uses BLE (`bleInUse()`) only in BLE mode, so in the other
+  modes the controller's RAM goes to the heap.
+* To make room in internal RAM: `NoteTracker::release()` no longer copies all held notes into a
+  16 KB static buffer, and the SD check's buffers are on the heap.
+* Messages from all connected BLE devices arrive as input BLE; BLE→BLE is never routed (an iPad
+  and the Oxi One connected together don't talk to each other through OxiMate).
+* BLE timestamps are decoded but not used for scheduling (arrival time is used).
+* No pairing/bonding; no BLE connection-interval display (requested 7.5–15 ms).
+
 **Full plan:** [docs/stages/stage-17.md](docs/stages/stage-17.md)
 
 ### Stage 18: Network MIDI
@@ -959,6 +995,33 @@ RTP-MIDI / AppleMIDI over Wi-Fi. This probably can't run at the same time as
 BLE MIDI (see Architecture).
 
 **Plan (2026-11-01):** RTP-MIDI/AppleMIDI, found by the Mac's Audio MIDI Setup over mDNS. OxiMate is its own access point by default, or joins a studio network. Wi-Fi power save is off for latency, which costs about 100 mA. Only one radio runs at a time; switching reboots.
+
+**Implemented (2026-11-05)** (the Wi-Fi firmware, see stage 17 for the two firmwares):
+
+* **Own access point by default:** "OxiMate-xxxx", WPA2, password `oxi-` + 8 hex digits derived
+  from the MAC address (both on the Radio page); OxiMate is 192.168.4.1.
+* **Join a network (option):** on the access point, open `http://192.168.4.1` on a phone or the
+  Mac, pick the network and type the password; OxiMate saves it and reboots into it. If it can't
+  join within 20 s it opens its own access point again. C on the Radio page forgets the network.
+* **Session:** mDNS `_apple-midi._udp` "OxiMate" on ports 5004/5005; the Mac (Audio MIDI Setup →
+  Network) or iPad starts the session, OxiMate answers. One session at a time (another host gets
+  NO). Clock sync answered; latency (half the sync round trip), packets and lost packets on the
+  Radio page. Session end (BY, or no sync for 60 s) releases held notes like an unplug.
+* **No clock** over the network; network input is routed to DIN and USB by default.
+* **Power save off** while network MIDI runs.
+
+Differences from the plan:
+
+* Own minimal AppleMIDI + RTP-MIDI implementation (`src/rtp_midi.*`, host-tested) instead of the
+  lathoub library: OxiMate never invites, sends without a recovery journal (J = 0) and ignores the
+  journal of what it receives (a lost packet is lost; counted as "lost").
+* The setup page is always on in access-point mode (no separate Setup mode, no captive DNS) and
+  there is no on-screen keyboard.
+* No clock to/from the network (decided 2026-11-05; the plan had clock on by default).
+* To fit the Wi-Fi stack's static RAM, the Analyse page's statistics copy (8 KB) moved to the heap.
+* No mDNS check on the access point network yet: if the Mac doesn't list OxiMate, add it by hand
+  in Audio MIDI Setup → Network (192.168.4.1, port 5004).
+
 **Full plan:** [docs/stages/stage-18.md](docs/stages/stage-18.md)
 
 ### Stage 19: Extra controls
@@ -1154,7 +1217,11 @@ make build                               # fetches + patches USB Host Shield 2.0
 make send PORT=/dev/cu.usbserial-XXXX    # upload
 make                                     # build + send
 make log SECONDS=20                      # reset the board and show its serial output
+make build-wifi && make send-wifi        # the Wi-Fi firmware into app slot 1 (stage 18)
 ```
+
+`make send` writes the BLE firmware to app slot 0 and boots it; `make send-wifi` writes the
+Wi-Fi firmware to slot 1 without changing which slot boots. The Radio page switches between them.
 
 ### Unit tests
 
@@ -1181,7 +1248,7 @@ which sets the Core2 pin mapping above, and marks the version as
 |------|---------|
 | `oximate.ino`       | setup and loop: starts the MIDI task, then drains its events into the UI |
 | `src/midi_task.*`   | MIDI task on core 0 (polls USB and DIN every 1 ms) and the event ring to the UI |
-| `src/midi_outputs.*`| the single send path (DIN, USB), with counters |
+| `src/midi_outputs.*`| the single send path (DIN, USB, BLE, NET), with counters |
 | `src/note_tracker.*`| held and sustained notes per output, as sent |
 | `src/spi_bus.*`     | lock for the SPI bus shared by display, USB host and SD |
 | `src/sd_check.*`    | SD card check at boot (type, size, 4 KB write/read time on the shared bus) |
@@ -1241,6 +1308,13 @@ which sets the Core2 pin mapping above, and marks the version as
 | `src/panic.*`       | panic levels 1–3, automatic release (USB unplug, Active Sensing, stuck notes) |
 | `src/diagnostics.h` | input statistics |
 | `src/diag_page.*`   | the Diag page |
+| `src/radio.*`       | radio mode and settings (NVS), `RadioTransport`, the two-firmware slot switch |
+| `src/radio_page.*`  | the Radio page (mode, status, routes, BLE device scan) |
+| `src/packet_ring.*` | SPSC ring of packets between a radio stack and the MIDI task |
+| `src/ble_midi_codec.*` | BLE MIDI packet decoder and encoder (pure, host-tested) |
+| `src/ble_midi.*`    | BLE MIDI on NimBLE-Arduino 2.x: peripheral, central, scan (BLE firmware) |
+| `src/rtp_midi.*`    | RTP-MIDI codec and AppleMIDI session (pure, host-tested) |
+| `src/net_midi.*`    | Wi-Fi access point / station, UDP, mDNS, setup page, network task (Wi-Fi firmware) |
 
 ## Credits
 

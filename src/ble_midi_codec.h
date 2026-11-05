@@ -1,9 +1,9 @@
 #pragma once
 
-#include <atomic>
 #include <stdint.h>
 #include <stddef.h>
 #include "midi_message.h"
+#include "packet_ring.h"
 
 /*! BLE MIDI packet format (Apple / MMA "MIDI over Bluetooth Low Energy", stage 17).
  *
@@ -75,25 +75,4 @@ private:
   size_t _length = 0;
   size_t _max = kMinPacket;
   uint8_t _header = 0;
-};
-
-/*! Single-producer single-consumer queue of packets (the BLE stack's task writes, the MIDI task
- *  reads); a packet that doesn't fit is dropped and counted */
-class PacketRing
-{
-public:
-  static constexpr size_t kBytes = 2048;
-
-  bool push(const uint8_t *data, size_t length);
-  /*! Copy the oldest packet into `out` (at least BleMidiEncoder::kMaxPacket + 3 bytes); 0 if empty */
-  size_t pop(uint8_t *out, size_t max);
-  size_t used() const { return _head.load() - _tail.load(); }
-  size_t freeBytes() const { return kBytes - used(); }
-  uint32_t dropped() const { return _dropped; }
-
-private:
-  uint8_t _buffer[kBytes];
-  std::atomic<size_t> _head{0}; ///< written by the producer (free-running)
-  std::atomic<size_t> _tail{0}; ///< written by the consumer (free-running)
-  uint32_t _dropped = 0;
 };

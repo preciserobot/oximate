@@ -12,6 +12,24 @@ enum class RadioMode : uint8_t
   Wifi = 2, ///< RTP-MIDI / AppleMIDI over Wi-Fi (stage 18)
 };
 
+/*! The BLE controller and the Wi-Fi stack don't both fit in the ESP32's IRAM with the precompiled
+ *  Arduino core (3.4 KB over), so there are two firmwares: BLE (`make build` / `make send`, app
+ *  slot 0) and Wi-Fi (`make build-wifi` / `make send-wifi`, built with -DOXIMATE_WIFI, slot 1).
+ *  Settings (NVS) are shared; choosing the other radio on the Radio page boots the other slot. */
+#if defined(OXIMATE_WIFI)
+constexpr RadioMode kBuiltRadio = RadioMode::Wifi;
+#else
+constexpr RadioMode kBuiltRadio = RadioMode::Ble;
+#endif
+
+namespace RadioFirmware
+{
+/*! The other app slot holds a firmware (presumably the other radio's) */
+bool otherInstalled();
+/*! Boot the other slot at the next restart; false if it holds no valid firmware */
+bool bootOther();
+} // namespace RadioFirmware
+
 /*! Radio settings, persisted in NVS (key "radio"). Bump kVersion when the layout changes. */
 struct RadioConfig
 {

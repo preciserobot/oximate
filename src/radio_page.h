@@ -28,6 +28,8 @@ public:
 private:
   MidiSource radioInput() const { return _running == RadioMode::Ble ? MidiSource::Ble : MidiSource::Net; }
   MidiOutput radioOutput() const { return _running == RadioMode::Ble ? MidiOutput::Ble : MidiOutput::Net; }
+  /*! The chosen radio is in the other firmware (other app slot, see radio.h) */
+  bool inOtherFirmware() const { return _config.mode != RadioMode::Off && _config.mode != kBuiltRadio; }
   void drawMain();
   void drawScan();
 

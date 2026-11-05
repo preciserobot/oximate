@@ -48,9 +48,10 @@ void ClockAnalyser::reset()
 
 const ClockStats &ClockAnalyser::copy(MidiSource input)
 {
+  if (!_uiCopy) _uiCopy = new ClockStats(); // on the heap, once (outside the critical section)
   CriticalGuard guard(_lock);
-  memcpy(&_uiCopy, &_stats[(int)input], sizeof(ClockStats));
-  return _uiCopy;
+  memcpy(_uiCopy, &_stats[(int)input], sizeof(ClockStats));
+  return *_uiCopy;
 }
 
 ClockPhase ClockAnalyser::phase()

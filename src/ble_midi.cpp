@@ -1,6 +1,6 @@
 #include "ble_midi.h"
 
-#if defined(ESP_PLATFORM)
+#if defined(ESP_PLATFORM) && !defined(OXIMATE_WIFI) // the BLE firmware (see radio.h)
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <freertos/FreeRTOS.h>
@@ -17,6 +17,11 @@ static NimBLECharacteristic *gCharacteristic = nullptr;
 static NimBLEClient *gClient = nullptr;
 static NimBLERemoteCharacteristic *gRemote = nullptr;
 static BleMidi *gBle = nullptr;
+
+/*! arduino-esp32 3.x releases the BLE controller's memory before setup() unless a library says it
+ *  uses BLE (NimBLE-Arduino doesn't). Keep it only when this boot runs BLE MIDI: in the other
+ *  radio modes the ~30 KB go to the heap (Wi-Fi needs it). Runs in initArduino(), after NVS init. */
+extern "C" bool bleInUse(void) { return RadioSettings::load().mode == RadioMode::Ble; }
 
 static void copyText(char *to, size_t size, const char *from)
 {
@@ -379,4 +384,4 @@ void BleMidi::status(char lines[kStatusLines][kStatusLength]) const
            (unsigned long)(_rxHost.dropped() + _rxPeer.dropped() + _tx.dropped()));
 }
 
-#endif // ESP_PLATFORM
+#endif // ESP_PLATFORM && !OXIMATE_WIFI
