@@ -132,17 +132,22 @@ int NoteTracker::collect(MidiOutput out, HeldNote *notes, int maxNotes, const Or
 
 void NoteTracker::release(MidiOutputs &outputs, MidiOutput out, const Origin *only)
 {
-  // Copy first: sending note-offs modifies the state being iterated
-  static HeldNote notes[16 * 128];
-  int count = collect(out, notes, 16 * 128, only);
-  for (int i = 0; i < count; i++) {
-    uint8_t bytes[3] = {(uint8_t)(0x80 | notes[i].channel), notes[i].note, 0};
-    MidiMessage off = {MidiSource::Din, 0, bytes, 3};
-    outputs.send(out, off, notes[i].origin);
-    // A sustained note stays sustained after its note-off; it is dropped here
-    State &s = _state[(int)out];
-    reset(s.sustained[notes[i].channel], notes[i].note);
-    freeSlot(s, notes[i].channel, notes[i].note);
+  // Note by note, reading the state afresh each time: a note-off only changes its own note (no
+  // copy of every held note: that took 16 KB of internal RAM, which BLE needs - stage 17)
+  State &s = _state[(int)out];
+  for (uint8_t ch = 0; ch < 16; ch++) {
+    for (int n = 0; n < 128; n++) {
+      if (!test(s.held[ch], n) && !test(s.sustained[ch], n)) continue;
+      const Slot *slot = findSlot(s, ch, n);
+      Origin origin = slot ? slot->origin : Origin{Origin::Internal, 0xFF}; // 0xFF: unknown
+      if (only && !(origin == *only)) continue;
+      uint8_t bytes[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0};
+      MidiMessage off = {MidiSource::Din, 0, bytes, 3};
+      outputs.send(out, off, origin);
+      // A sustained note stays sustained after its note-off; it is dropped here
+      reset(s.sustained[ch], n);
+      freeSlot(s, ch, n);
+    }
   }
   if (!only) {
     uint16_t pedal = _state[(int)out].pedal;

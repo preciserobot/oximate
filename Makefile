@@ -11,7 +11,12 @@ libraries/USB_Host_Shield_2.0/.patched:
 	patch -s -p0 < USB_Host_Shield_2.0.patch
 	touch libraries/USB_Host_Shield_2.0/.patched
 
-build: libraries/USB_Host_Shield_2.0/.patched
+# Stage 17: NimBLE-Arduino pinned here (a copy in the sketchbook may be older, or incomplete)
+libraries/NimBLE-Arduino/.cloned:
+	git clone --depth 1 --branch 2.5.0 https://github.com/h2zero/NimBLE-Arduino.git libraries/NimBLE-Arduino
+	touch libraries/NimBLE-Arduino/.cloned
+
+build: libraries/USB_Host_Shield_2.0/.patched libraries/NimBLE-Arduino/.cloned
 	time arduino-cli compile \
 		--fqbn esp32:esp32:m5stack_core2 \
 		--libraries libraries

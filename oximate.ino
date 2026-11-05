@@ -58,6 +58,7 @@
 #include "src/phrase_tracker.h"
 #include "src/radio.h"
 #include "src/radio_page.h"
+#include "src/ble_midi.h"
 #include "src/router.h"
 #include "src/router_page.h"
 #include "src/sam_synth.h"
@@ -226,6 +227,18 @@ void setup()
     Serial.println("SD: no card (or not FAT16/FAT32)");
   }
   SdStore::begin([] { return clockEngine.snapshot().running; }); // 1 KB chunks while the clock runs
+
+  // Stage 17/18: the radio chosen for this boot (on the heap: nothing is used while it is off)
+  if (radioMode == RadioMode::Ble) {
+    Ui::splash("Bluetooth");
+    BleMidi *ble = new BleMidi();
+    if (ble->begin(radioConfig, onMidi)) {
+      radio = ble;
+      outputs.setPort(MidiOutput::Ble, ble);
+    } else {
+      Serial.println("BLE init failed");
+    }
+  }
 
   // Keep the start-up screen up for at least 3 s, then the pages take over
   while (millis() - splashStart < 3000) delay(10);

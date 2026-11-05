@@ -34,7 +34,13 @@ SdInfo SdCheck::run()
   info.totalBytes = SD.totalBytes();
   info.usedBytes = SD.usedBytes();
 
-  static uint8_t buffer[kChunk];
+  // On the heap for the test only (static RAM is short with BLE on, stage 17)
+  uint8_t *buffer = (uint8_t *)malloc(2 * kChunk);
+  if (!buffer) {
+    gResult = info;
+    return info;
+  }
+  uint8_t *readBack = buffer + kChunk;
   for (size_t i = 0; i < kChunk; i++) buffer[i] = (uint8_t)(i * 7 + 3);
 
   File file = SD.open(kTestFile, FILE_WRITE);
@@ -47,7 +53,6 @@ SdInfo SdCheck::run()
     if (written == kChunk) {
       file = SD.open(kTestFile, FILE_READ);
       if (file) {
-        static uint8_t readBack[kChunk];
         start = micros();
         size_t got = file.read(readBack, kChunk);
         info.readMicros = micros() - start;
@@ -57,6 +62,7 @@ SdInfo SdCheck::run()
     }
     SD.remove(kTestFile);
   }
+  free(buffer);
   gResult = info;
   return info;
 }

@@ -39,6 +39,10 @@ RadioConfig load();
 void save(const RadioConfig &config);
 } // namespace RadioSettings
 
+/*! No clock over radio, in either direction (decided 2026-11-05): radio transports drop clock and
+ *  transport bytes they are asked to send (the Router already ignores them from radio inputs) */
+inline bool radioCarries(uint8_t status) { return status != 0xF8 && (status < 0xFA || status > 0xFC); }
+
 /*! A radio MIDI transport. begin() runs in setup() (before the MIDI task), poll() in the MIDI task
  *  (decode what arrived, hand complete messages to the handler, flush what was sent), the rest on
  *  the UI thread. */
